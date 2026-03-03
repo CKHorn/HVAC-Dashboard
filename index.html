@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HVAC Engineering Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#F7F8FA;color:#374151}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@media print{@page{margin:.6in;size:letter} .no-print{display:none!important} button{display:none!important} input[type=file]{display:none!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useRef,useEffect}=React;
+const C={bg:"#F7F8FA",surface:"#FFFFFF",surfaceAlt:"#F0F2F5",border:"#E2E6EA",accent:"#3B82F6",accentLight:"#EFF6FF",text:"#374151",textMuted:"#6B7280",textLight:"#9CA3AF",success:"#10B981",warn:"#F59E0B",danger:"#EF4444"};
+const s={
+  app:{fontFamily:"'Segoe UI',Arial,sans-serif",background:C.bg,minHeight:"100vh",color:C.text},
+  header:{background:C.surface,borderBottom:"1px solid "+C.border,padding:"12px 24px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"},
+  logo:{width:34,height:34,background:C.accent,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},
+  nav:{display:"flex",gap:2,padding:"0 24px",background:C.surface,borderBottom:"1px solid "+C.border,flexWrap:"wrap"},
+  tabBtn:a=>({padding:"10px 14px",fontSize:12,fontWeight:500,border:"none",cursor:"pointer",background:"transparent",color:a?C.accent:C.textMuted,borderBottom:a?"2px solid "+C.accent:"2px solid transparent",whiteSpace:"nowrap"}),
+  content:{padding:"24px",maxWidth:1200,margin:"0 auto"},
+  card:{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:24,marginBottom:20},
+  secTitle:{fontSize:11,fontWeight:600,color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:14,marginTop:0},
+  label:{fontSize:12,fontWeight:500,color:C.textMuted,marginBottom:5,display:"block"},
+  input:{width:"100%",padding:"8px 11px",border:"1px solid "+C.border,borderRadius:7,fontSize:13,color:C.text,background:C.surface,boxSizing:"border-box",outline:"none"},
+  select:{width:"100%",padding:"8px 11px",border:"1px solid "+C.border,borderRadius:7,fontSize:13,color:C.text,background:C.surface,boxSizing:"border-box"},
+  btn:{padding:"9px 20px",background:C.accent,color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer"},
+  btnOut:{padding:"8px 16px",background:"transparent",color:C.accent,border:"1px solid "+C.accent,borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer"},
+  btnGreen:{padding:"9px 20px",background:"#16a34a",color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer"},
+  resBox:{background:C.accentLight,border:"1px solid #BFDBFE",borderRadius:10,padding:20,marginBottom:20},
+  resGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:12},
+  resItem:{background:C.surface,borderRadius:8,padding:"10px 14px",border:"1px solid "+C.border},
+  resVal:{fontSize:19,fontWeight:700,color:C.accent},
+  resLabel:{fontSize:11,color:C.textMuted,marginTop:2},
+  table:{width:"100%",borderCollapse:"collapse",fontSize:13},
+  th:{background:C.surfaceAlt,padding:"9px 13px",textAlign:"left",fontSize:11,fontWeight:600,color:C.textMuted,borderBottom:"1px solid "+C.border},
+  td:{padding:"9px 13px",borderBottom:"1px solid "+C.border,color:C.text},
+  badge:c=>({display:"inline-block",padding:"1px 7px",borderRadius:99,fontSize:11,fontWeight:500,background:c==="green"?"#D1FAE5":c==="red"?"#FEE2E2":"#FEF3C7",color:c==="green"?"#065F46":c==="red"?"#991B1B":"#92400E"}),
+};
+const r2=v=>Math.round(v*100)/100;
+const r0=v=>Math.round(v);
+const nv=v=>parseFloat(v)||0;
+
+function StatCard({label,value,unit,color}){
+  return <div style={{background:C.surface,border:"1px solid "+(color||C.border),borderRadius:9,padding:"10px 14px",borderLeft:"4px solid "+(color||C.accent)}}><div style={{fontSize:11,color:C.textMuted,marginBottom:3}}>{label}</div><div style={{fontSize:18,fontWeight:700,color:color||C.accent}}>{value}<span style={{fontSize:11,fontWeight:400,color:C.textLight,marginLeft:4}}>{unit}</span></div></div>;
+}
+function EquipInput({label,value,onChange}){
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"7px 12px",background:C.surface,borderRadius:7,border:"1px solid "+C.border}}><span style={{fontSize:12,color:C.text,flex:1}}>{label}</span><div style={{display:"flex",alignItems:"center",gap:6}}><button onClick={()=>onChange(Math.max(0,value-1))} style={{width:24,height:24,borderRadius:5,border:"1px solid "+C.border,background:C.surfaceAlt,cursor:"pointer",fontSize:14}}>-</button><span style={{width:26,textAlign:"center",fontWeight:700,fontSize:14,color:C.accent}}>{value}</span><button onClick={()=>onChange(value+1)} style={{width:24,height:24,borderRadius:5,border:"1px solid "+C.border,background:C.surfaceAlt,cursor:"pointer",fontSize:14}}>+</button></div></div>;
+}
+function DeltaTInput({label,entering,setEntering,leaving,setLeaving,dt}){
+  return <div style={{background:C.surfaceAlt,borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,fontWeight:700,color:C.textMuted,textTransform:"uppercase",marginBottom:8}}>{label}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 60px",gap:8,alignItems:"end"}}><div><label style={{...s.label,marginBottom:2,fontSize:11}}>Entering (F)</label><input style={{...s.input,background:"#EFF6FF",fontSize:12,padding:"5px 8px"}} type="number" value={entering} onChange={e=>setEntering(e.target.value)}/></div><div><label style={{...s.label,marginBottom:2,fontSize:11}}>Leaving (F)</label><input style={{...s.input,background:"#EFF6FF",fontSize:12,padding:"5px 8px"}} type="number" value={leaving} onChange={e=>setLeaving(e.target.value)}/></div><div style={{textAlign:"center",paddingBottom:2}}><div style={{fontSize:10,color:C.textMuted}}>dT</div><div style={{fontSize:17,fontWeight:700,color:C.accent}}>{r2(Math.abs(dt))}F</div></div></div></div>;
+}
+
+// ── DUCT SIZING ───────────────────────────────────────────
+function calcDuctProps(cfm,shape,diaIn,wIn,hIn){
+  const rho=0.075,mu=0.0432;let area,eqDia;
+  if(shape==="round"){const d=parseFloat(diaIn);if(!d||d<=0)return null;area=Math.PI*(d/2)**2/144;eqDia=d;}
+  else{const w=parseFloat(wIn),h=parseFloat(hIn);if(!w||!h||w<=0||h<=0)return null;area=w*h/144;eqDia=1.3*Math.pow(w*h,0.625)/Math.pow(w+h,0.25);}
+  const c=parseFloat(cfm);if(!c||c<=0||area<=0)return null;
+  const vel=c/area,Re=rho*vel*(eqDia/12)/(mu/3600),rr=0.0003/(eqDia/12);
+  const f=0.25/Math.pow(Math.log10(rr/3.7+5.74/Math.pow(Re,0.9)),2);
+  return{area:r2(area),eqDia:r2(eqDia),vel:r2(vel),Re:Math.round(Re),f_darcy:r2(f),vp:r2(rho*vel*vel/9266),hl:r2(f*(1/(eqDia/12))*(vel*vel/(2*32.174))*rho/144*100)};
+}
+function DuctSizing(){
+  const [f,setF]=useState({cfm:1000,method:"velocity",velocity:1500,shape:"rect",ductWidth:12});
+  const [res,setRes]=useState(()=>{const w=12,cfm=1000,vel=1500,a2=cfm/vel*144,h=r2((a2/144)/w*144),p=calcDuctProps(cfm,"rect",null,w,h);return p?{shape:"rect",w,h,...p}:null;});const [chkDia,setChkDia]=useState("");const [chkW,setChkW]=useState("");const [chkH,setChkH]=useState("");
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  let chkProps=null,chkLabel="";
+  if(f.shape==="round"&&parseFloat(chkDia)>0){chkProps=calcDuctProps(f.cfm,"round",chkDia);chkLabel='Dia '+chkDia+'" @ '+f.cfm+' CFM';}
+  else if(f.shape==="rect"&&parseFloat(chkW)>0&&parseFloat(chkH)>0){chkProps=calcDuctProps(f.cfm,"rect",null,chkW,chkH);chkLabel=chkW+'"x'+chkH+'" @ '+f.cfm+' CFM';}
+  const calc=()=>{
+    const cfm=parseFloat(f.cfm),vel=parseFloat(f.velocity),a2=f.method==="velocity"?cfm/vel*144:cfm/700*144;
+    if(f.shape==="round"){const dia=r2(Math.sqrt(a2*4/Math.PI)),stds=[4,5,6,7,8,9,10,12,14,16,18,20,22,24,26,28,30],std=stds.find(x=>x>=dia)||dia;const p=calcDuctProps(cfm,"round",std);if(p)setRes({shape:"round",dia,std,...p});}
+    else{const w=parseFloat(f.ductWidth);if(!w)return;const h=r2((a2/144)/w*144),p=calcDuctProps(cfm,"rect",null,w,h);if(p)setRes({shape:"rect",w,h,...p});}
+  };
+  const vcol=v=>v<1200?C.success:v>2000?C.danger:C.warn;
+  const hcol=h=>h<0.15?C.success:h>0.25?C.danger:C.warn;
+  const vb=v=>v<1200?"green":v>2000?"red":"yellow";
+  const PR=({label,val,unit,color})=><tr><td style={{...s.td,fontSize:12,color:C.textMuted,padding:"4px 8px"}}>{label}</td><td style={{...s.td,fontSize:12,fontWeight:600,padding:"4px 8px",color:color||C.text}}>{val}</td><td style={{...s.td,fontSize:11,color:C.textLight,padding:"4px 8px"}}>{unit}</td></tr>;
+  return <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:20,alignItems:"start"}}>
+    <div>
+      <div style={s.card}><p style={s.secTitle}>Sizing Parameters</p><div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div><label style={s.label}>Airflow (CFM)</label><input style={s.input} type="number" value={f.cfm} onChange={e=>set("cfm",e.target.value)}/></div>
+        <div><label style={s.label}>Method</label><select style={s.select} value={f.method} onChange={e=>set("method",e.target.value)}><option value="velocity">Velocity</option><option value="friction">Equal Friction</option></select></div>
+        <div><label style={s.label}>Shape</label><select style={s.select} value={f.shape} onChange={e=>{set("shape",e.target.value);setRes(null);}}><option value="round">Round</option><option value="rect">Rectangular</option></select></div>
+        {f.method==="velocity"?<div><label style={s.label}>Design Velocity (FPM)</label><input style={s.input} type="number" value={f.velocity} onChange={e=>set("velocity",e.target.value)}/></div>:<div><label style={s.label}>Friction Rate (in.wg/100ft)</label><input style={s.input} type="number" step="0.01" value={f.friction||"0.08"} onChange={e=>set("friction",e.target.value)}/></div>}
+        {f.shape==="rect"&&<div><label style={s.label}>Duct Width (in)</label><input style={s.input} type="number" value={f.ductWidth} onChange={e=>set("ductWidth",e.target.value)}/></div>}
+      </div><div style={{marginTop:16}}><button style={{...s.btn,width:"100%"}} onClick={calc}>Calculate Size</button></div></div>
+      <div style={s.card}><p style={s.secTitle}>Check a Duct Size</p>
+        {f.shape==="round"?<div><label style={s.label}>Diameter (in)</label><input style={s.input} type="number" placeholder="e.g. 12" value={chkDia} onChange={e=>setChkDia(e.target.value)}/></div>:<div style={{display:"flex",gap:8}}><div style={{flex:1}}><label style={s.label}>Width</label><input style={s.input} type="number" value={chkW} onChange={e=>setChkW(e.target.value)}/></div><div style={{flex:1}}><label style={s.label}>Height</label><input style={s.input} type="number" value={chkH} onChange={e=>setChkH(e.target.value)}/></div></div>}
+        {chkProps&&<div style={{marginTop:12,background:C.surfaceAlt,borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.textMuted,marginBottom:6}}>{chkLabel}</div><table style={s.table}><tbody><PR label="Velocity" val={chkProps.vel.toLocaleString()} unit="ft/min" color={vcol(chkProps.vel)}/><PR label="Equiv. Dia." val={chkProps.eqDia} unit="in"/><PR label="Reynolds No." val={chkProps.Re.toLocaleString()} unit=""/><PR label="Head Loss" val={chkProps.hl} unit="in.WC/100ft" color={hcol(chkProps.hl)}/></tbody></table></div>}
+      </div>
+    </div>
+    <div>
+      {res&&<div style={s.resBox}><p style={s.secTitle}>Result</p><div style={s.resGrid}>
+        {res.shape==="round"?<><div style={s.resItem}><div style={s.resVal}>{res.dia}"</div><div style={s.resLabel}>Calc Dia</div></div><div style={s.resItem}><div style={{...s.resVal,color:C.success}}>{res.std}"</div><div style={s.resLabel}>Std Size</div></div></>:<div style={s.resItem}><div style={s.resVal}>{res.w}"x{res.h}"</div><div style={s.resLabel}>Dimensions</div></div>}
+        <div style={s.resItem}><div style={{...s.resVal,color:vcol(res.vel)}}>{res.vel.toLocaleString()}</div><div style={s.resLabel}>FPM <span style={s.badge(vb(res.vel))}>{vb(res.vel)==="green"?"OK":vb(res.vel)==="red"?"High":"Warn"}</span></div></div>
+        <div style={s.resItem}><div style={{...s.resVal,color:hcol(res.hl)}}>{res.hl}</div><div style={s.resLabel}>in.wg/100ft</div></div>
+      </div></div>}
+      <div style={s.card}>
+        <p style={s.secTitle}>Ductwork Sizing Criteria</p>
+        <div style={{overflowX:"auto",marginBottom:8}}>
+        <table style={{...s.table,fontSize:12}}>
+          <thead>
+            <tr>
+              <th style={{...s.th,minWidth:160}}>System Type</th>
+              <th style={{...s.th,textAlign:"center",width:110}}>Max Friction Rate<br/>in. wg / 100 ft.</th>
+              <th style={{...s.th,textAlign:"center",width:90}}>Minimum Velocity<br/>FT/MIN</th>
+              <th style={{...s.th,textAlign:"center",width:110}}>Maximum Velocity<br/>FT/MIN</th>
+              <th style={{...s.th,minWidth:260}}>Comments / Reasons</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colSpan={5} style={{...s.td,fontWeight:700,background:"#d9d9d9",fontSize:11,letterSpacing:"0.04em"}}>GENERAL AIR HANDLING SYSTEMS</td></tr>
+            {[
+              ["Low pressure ducts",".10 (.15)","—","1,500–1,800","When CFM > 6,000 Velocity Governs; When CFM < 6,000 Friction Rate Governs; Applicable for Supply, Return, Exhaust and Outside Air Systems"],
+              ["Medium pressure Ducts",".20 (.25)","—","2,500–3,500","When CFM > 6,000 Velocity Governs; When CFM < 6,000 Friction Rate Governs; Applicable for Supply Systems Only"],
+              ["High pressure ducts",".40 (.45)","—","2,500–3,500","When CFM > 5,000 Velocity Governs; When CFM < 5,000 Friction Rate Governs; Applicable for Supply Systems Only"],
+              ["Transfer air ducts",".03–.05","—","1,000","When CFM > 3,200 Velocity Governs; When CFM < 3,200 Friction Rate Governs"],
+              ["Outside air shafts",".05–.10","—","1,000","When CFM > 1,200 Velocity Governs; When CFM < 1,200 Friction Rate Governs"],
+              ["Gravity relief air shafts",".03–.05","—","1,000","When CFM > 3,200 Velocity Governs; When CFM < 3,200 Friction Rate Governs"],
+            ].map(([a,b,c,d,e])=><tr key={a}><td style={s.td}>{a}</td><td style={{...s.td,textAlign:"center"}}>{b}</td><td style={{...s.td,textAlign:"center"}}>{c}</td><td style={{...s.td,textAlign:"center"}}>{d}</td><td style={{...s.td,fontSize:11,color:C.textMuted,lineHeight:1.6}}>{e}</td></tr>)}
+            <tr><td colSpan={5} style={{...s.td,fontWeight:700,background:"#d9d9d9",fontSize:11,letterSpacing:"0.04em"}}>GENERAL EXHAUST AND SPECIAL EXHAUST SYSTEMS</td></tr>
+            {[
+              ["General Exhaust Ducts",".10 (.15)","—","1,500–1,800","When CFM > 6,000 Velocity Governs; When CFM < 6,000 Friction Rate Governs"],
+              ["Toilet Exhaust Ducts","—","—","1,500–1,800","When CFM > 6,000 Velocity Governs; When CFM < 6,000 Friction Rate Governs"],
+              ["Kitchen Hood Exhaust Ducts","—","1,500","2,200","NFPA: 1500 FPM MIN"],
+              ["Dishwasher Exhaust Ducts",".10 (.15)","1,500","2,200","NONE"],
+            ].map(([a,b,c,d,e])=><tr key={a}><td style={s.td}>{a}</td><td style={{...s.td,textAlign:"center"}}>{b}</td><td style={{...s.td,textAlign:"center"}}>{c}</td><td style={{...s.td,textAlign:"center"}}>{d}</td><td style={{...s.td,fontSize:11,color:C.textMuted}}>{e}</td></tr>)}
+            <tr><td colSpan={5} style={{...s.td,fontWeight:700,background:"#d9d9d9",fontSize:11,letterSpacing:"0.04em"}}>LOUVERS</td></tr>
+            {[
+              ["Intake","—","—","500","Maximum Velocity through Free Area; Assuming 60% Free Area – Max. Velocity 250 FPM through Gross Louver Area"],
+              ["Exhaust","—","—","700","Maximum Velocity through Free Area; Assuming 60% Free Area – Max. Velocity 350 FPM through Gross Louver Area"],
+            ].map(([a,b,c,d,e])=><tr key={a}><td style={s.td}>{a}</td><td style={{...s.td,textAlign:"center"}}>{b}</td><td style={{...s.td,textAlign:"center"}}>{c}</td><td style={{...s.td,textAlign:"center"}}>{d}</td><td style={{...s.td,fontSize:11,color:C.textMuted,lineHeight:1.6}}>{e}</td></tr>)}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:12,padding:"20px 24px",marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+          <span style={{fontSize:16}}>📝</span>
+          <span style={{fontSize:12,fontWeight:700,color:"#92400E",textTransform:"uppercase",letterSpacing:"0.06em"}}>Ductwork Sizing Methods</span>
+        </div>
+        {[
+          {num:"1",title:"Equal Friction Method",bullets:["This method involves designing the duct system so that the friction loss per unit length is constant throughout the system. It is one of the most commonly used methods due to its simplicity and effectiveness.","Steps include calculating the total airflow (CFM), selecting a friction rate, and using duct sizing charts or calculators to determine duct sizes."]},
+          {num:"2",title:"Velocity Reduction Method",bullets:["This method aims to reduce the air velocity in the ducts to minimize noise and energy loss. It is often used in systems where noise control is a priority.","Steps include determining the desired air velocity, calculating the required duct size to achieve that velocity, and adjusting the duct sizes as needed."]},
+          {num:"3",title:"Static Regain Method",bullets:["This method is used to design duct systems that maintain a constant static pressure throughout the system. It is often used in large commercial or industrial systems.","Steps include calculating the static pressure at various points in the system, adjusting duct sizes to maintain constant static pressure, and using duct sizing charts or software."]},
+        ].map(item=>(
+          <div key={item.num} style={{marginBottom:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:8}}>{item.num}.&nbsp;&nbsp;{item.title}:</div>
+            {item.bullets.map((b,i)=>(
+              <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:5,paddingLeft:20}}>
+                <span style={{color:"#D97706",fontSize:15,lineHeight:1.4,flexShrink:0}}>·</span>
+                <span style={{fontSize:12.5,color:"#78350F",lineHeight:1.75}}>{b}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>;
+}
+
+// ── SD LOAD CALCS ─────────────────────────────────────────
+const SYSTEM_TYPES=[{id:"split_dx",label:"Split DX"},{id:"vrf",label:"VRF"},{id:"wc_chw",label:"Water Cooled CHW"},{id:"ac_chw",label:"Air Cooled CHW"},{id:"cond_water",label:"Condenser Water (WSHP)"},{id:"pkg_rtu",label:"Packaged RTU (DX)"}];
+const SYS_LABELS={"split_dx":"Split DX","vrf":"VRF","wc_chw":"Water Cooled CHW","ac_chw":"Air Cooled CHW","cond_water":"Condenser Water (WSHP)","pkg_rtu":"Packaged RTU (DX)"};
+const DEFAULT_SF_TON={"Office":400,"Conference":350,"Classroom":350,"Retail":250,"Restaurant":275,"Kitchen":250,"Hotel Room":550,"Residential":550,"Server Room":50,"Gym / Fitness":175,"Lobby / Atrium":275,"Warehouse":600,"Corridor":700,"Mechanical Rm":800,"Custom":400};
+const calcRow=r=>{const area=Number(r.area)||0,sfton=Number(r.sfton)||1,oaPct=Number(r.oaPct)||0;const tons=area>0?r2(area/sfton):0;const cfm=r0(tons*400);const oaCfm=r0(cfm*(oaPct/100));return{...r,tons,cfm,oaCfm};};
+
+function getGpmSources(sel,totalTons,eq){
+  const OF=eq.oversize?1.2:1,dt=r2((totalTons||0)*OF);
+  const chwDT=nv(eq.chwEWT)-nv(eq.chwLWT),cwDT=nv(eq.cwLWT)-nv(eq.cwEWT),acDT=nv(eq.acEWT)-nv(eq.acLWT),lswDT=nv(eq.lswLWT)-nv(eq.lswEWT);
+  const src=[];
+  if(sel.includes("wc_chw")){src.push({id:"wc_chw_chw",label:"WC CHW GPM ("+(chwDT>0?r2(dt*24/chwDT):0)+" GPM)",gpm:chwDT>0?r2(dt*24/chwDT):0});src.push({id:"wc_chw_cw",label:"WC CW GPM ("+(cwDT>0?r2(dt*30/cwDT):0)+" GPM)",gpm:cwDT>0?r2(dt*30/cwDT):0});}
+  if(sel.includes("ac_chw")){const g=acDT>0?r2(dt*24/acDT):0;src.push({id:"ac_chw_chw",label:"AC CHW GPM ("+g+" GPM)",gpm:g});}
+  if(sel.includes("cond_water")){const g=lswDT>0?r2(dt*24/lswDT):0;src.push({id:"cond_loop",label:"WSHP Loop GPM ("+g+" GPM)",gpm:g});}
+  if(sel.includes("vrf"))src.push({id:"vrf_ref",label:"VRF - Refrigerant (no GPM)",gpm:0,disabled:true});
+  if(sel.includes("split_dx")||sel.includes("pkg_rtu"))src.push({id:"dx_ref",label:"DX - Refrigerant (no GPM)",gpm:0,disabled:true});
+  return src;
+}
+
+function SystemEquipPanel({selected,totalTons,totalCfm,totalOaCfm,eq,setEq}){
+  const OF=eq.oversize?1.2:1,osl=eq.oversize?" (x1.20)":"";
+  const se=(k,v)=>setEq(p=>({...p,[k]:v}));
+  const tons=totalTons||0,dt=r2(tons*OF);
+  const chwDT=nv(eq.chwEWT)-nv(eq.chwLWT),cwDT=nv(eq.cwLWT)-nv(eq.cwEWT),acDT=nv(eq.acEWT)-nv(eq.acLWT),lswDT=nv(eq.lswLWT)-nv(eq.lswEWT);
+  const chwGPM=chwDT>0?r2(dt*24/chwDT):0,cwGPM=cwDT>0?r2(dt*30/cwDT):0;
+  const acGPM=acDT>0?r2(dt*24/acDT):0,lswGPM=lswDT>0?r2(dt*24/lswDT):0;
+  if(!selected.some(id=>["vrf","wc_chw","ac_chw","cond_water"].includes(id)))return null;
+  const ps={background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"16px 18px"};
+  return <div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      <p style={{...s.secTitle,marginBottom:0}}>Equipment Schedule</p>
+      <label onClick={()=>se("oversize",!eq.oversize)} style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",userSelect:"none",padding:"5px 12px",borderRadius:8,border:"1px solid "+(eq.oversize?C.accent:C.border),background:eq.oversize?C.accentLight:C.surface,fontSize:12,color:eq.oversize?C.accent:C.textMuted}}>
+        <div style={{width:15,height:15,borderRadius:3,border:"2px solid "+(eq.oversize?C.accent:C.border),background:eq.oversize?C.accent:"white",display:"flex",alignItems:"center",justifyContent:"center"}}>{eq.oversize&&<span style={{color:"white",fontSize:10}}>✓</span>}</div>
+        20% Oversizing
+      </label>
+    </div>
+    <div style={{background:C.accentLight,border:"1px solid #BFDBFE",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:12,color:C.textMuted,display:"flex",gap:16,flexWrap:"wrap"}}>
+      <span>Base: <strong>{tons} tons</strong></span><span>Design{osl}: <strong style={{color:C.accent}}>{dt} tons</strong></span>
+      <span>Supply CFM: <strong style={{color:C.accent}}>{totalCfm.toLocaleString()}</strong></span>
+      <span>OA CFM: <strong style={{color:"#059669"}}>{totalOaCfm.toLocaleString()}</strong></span>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
+      {selected.includes("vrf")&&<div style={ps}><div style={{fontSize:13,fontWeight:700,marginBottom:12}}>VRF</div><EquipInput label="Condensers" value={eq.vrfCond} onChange={v=>se("vrfCond",v)}/><div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><StatCard label={"Design Tons"+osl} value={dt} unit="tons" color={C.accent}/><StatCard label="Tons/Condenser" value={eq.vrfCond>0?r2(dt/eq.vrfCond):0} unit="tons"/></div></div>}
+      {selected.includes("wc_chw")&&<div style={ps}><div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Water Cooled CHW</div><div style={{display:"grid",gap:7,marginBottom:12}}><EquipInput label="Chillers" value={eq.wcChillers} onChange={v=>se("wcChillers",v)}/><EquipInput label="CHW Pumps" value={eq.wcChwPumps} onChange={v=>se("wcChwPumps",v)}/><EquipInput label="CW Pumps" value={eq.wcCwPumps} onChange={v=>se("wcCwPumps",v)}/><EquipInput label="Cooling Towers" value={eq.wcTowers} onChange={v=>se("wcTowers",v)}/></div><DeltaTInput label="Chilled Water" entering={eq.chwEWT} setEntering={v=>se("chwEWT",v)} leaving={eq.chwLWT} setLeaving={v=>se("chwLWT",v)} dt={chwDT}/><div style={{marginTop:8}}><DeltaTInput label="Condenser Water" entering={eq.cwEWT} setEntering={v=>se("cwEWT",v)} leaving={eq.cwLWT} setLeaving={v=>se("cwLWT",v)} dt={cwDT}/></div><div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}><StatCard label={"Tons/Chiller"+osl} value={eq.wcChillers>0?r2(dt/eq.wcChillers):0} unit="tons" color={C.accent}/><StatCard label={"CHW GPM"+osl} value={chwGPM} unit="GPM" color={C.accent}/><StatCard label={"CW GPM"+osl} value={cwGPM} unit="GPM" color="#0891B2"/><StatCard label={"Tons/Tower"+osl} value={eq.wcTowers>0?r2(dt/eq.wcTowers):0} unit="tons"/></div></div>}
+      {selected.includes("ac_chw")&&<div style={ps}><div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Air Cooled CHW</div><div style={{display:"grid",gap:7,marginBottom:12}}><EquipInput label="Chillers" value={eq.acChillers} onChange={v=>se("acChillers",v)}/><EquipInput label="CHW Pumps" value={eq.acPumps} onChange={v=>se("acPumps",v)}/></div><DeltaTInput label="Chilled Water" entering={eq.acEWT} setEntering={v=>se("acEWT",v)} leaving={eq.acLWT} setLeaving={v=>se("acLWT",v)} dt={acDT}/><div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}><StatCard label={"Tons/Chiller"+osl} value={eq.acChillers>0?r2(dt/eq.acChillers):0} unit="tons" color={C.accent}/><StatCard label={"CHW GPM"+osl} value={acGPM} unit="GPM" color={C.accent}/></div></div>}
+      {selected.includes("cond_water")&&<div style={ps}><div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Condenser Water (WSHP)</div><div style={{display:"grid",gap:7,marginBottom:12}}><EquipInput label="CW Pumps" value={eq.cwPumps2} onChange={v=>se("cwPumps2",v)}/><EquipInput label="Cooling Towers" value={eq.cwTowers2} onChange={v=>se("cwTowers2",v)}/></div><DeltaTInput label="Loop Supply/Return" entering={eq.lswEWT} setEntering={v=>se("lswEWT",v)} leaving={eq.lswLWT} setLeaving={v=>se("lswLWT",v)} dt={lswDT}/><div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}><StatCard label={"Loop GPM"+osl} value={lswGPM} unit="GPM" color={C.accent}/><StatCard label={"Tons/Tower"+osl} value={eq.cwTowers2>0?r2(dt/eq.cwTowers2):0} unit="tons"/></div></div>}
+    </div>
+  </div>;
+}
+
+const initSd={selectedSystems:[],presets:{...DEFAULT_SF_TON},
+  rooms:[calcRow({id:1,room:"Lobby",floor:"1",type:"Lobby / Atrium",area:800,sfton:275,oaPct:12}),calcRow({id:2,room:"Open Office",floor:"1",type:"Office",area:2400,sfton:400,oaPct:12}),calcRow({id:3,room:"Conference A",floor:"1",type:"Conference",area:450,sfton:350,oaPct:12}),calcRow({id:4,room:"Server Room",floor:"1",type:"Server Room",area:120,sfton:50,oaPct:12})],
+  equipState:{oversize:true,vrfCond:1,wcChillers:1,wcChwPumps:2,wcCwPumps:2,wcTowers:1,chwEWT:"54",chwLWT:"44",cwEWT:"85",cwLWT:"95",acChillers:1,acPumps:2,acEWT:"54",acLWT:"44",cwPumps2:2,cwTowers2:1,lswEWT:"85",lswLWT:"95"}};
+
+function exportCSV(sdState,projName){
+  const {rooms,presets}=sdState;
+  const tot=rooms.reduce((a,r)=>({area:a.area+(Number(r.area)||0),tons:r2(a.tons+(r.tons||0)),cfm:a.cfm+(r.cfm||0),oaCfm:a.oaCfm+(r.oaCfm||0)}),{area:0,tons:0,cfm:0,oaCfm:0});
+  let csv=[["HVAC SD LOAD CALCULATION"],["Project:",projName||"---"],["Date:",new Date().toLocaleDateString()],[],["LOAD SUMMARY"],["Total Tons","Total Btu/hr","Supply CFM","OA CFM","Total Area ft2"],[tot.tons,tot.tons*12000,tot.cfm,tot.oaCfm,tot.area],[],["PRELIMINARY LOAD TABLE"],["Room","Floor","Type","Area ft2","sf/Ton","Tons","CFM","OA%","OA CFM"]];
+  rooms.forEach(r=>csv.push([r.room,r.floor,r.type,r.area,r.sfton,r.tons,r.cfm,r.oaPct,r.oaCfm]));
+  csv.push(["TOTALS","","",tot.area,"",tot.tons,tot.cfm,"",tot.oaCfm]);
+  const str=csv.map(row=>row.map(c=>{const s=String(c==null?"":c);return s.includes(",")?'"'+s+'"':s;}).join(",")).join("\n");
+  const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(str);a.download=(projName||"HVAC")+"_load_calcs.csv";a.click();
+}
+
+function PDFExtractor({onExtract,presets}){
+  const [loading,setLoading]=useState(false);
+  const [status,setStatus]=useState("");
+  const [dragging,setDragging]=useState(false);
+  const fileRef=useRef();
+  const processFile=async(file)=>{
+    if(!file||file.type!=="application/pdf")return;
+    setLoading(true);setDragging(false);setStatus("Extracting with AI...");
+    try{
+      const b64=await new Promise((res,rej)=>{const rd=new FileReader();rd.onload=()=>res(rd.result.split(",")[1]);rd.onerror=rej;rd.readAsDataURL(file);});
+      const resp=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:'Extract all rooms/spaces and areas. Return ONLY a raw JSON array (no markdown): [{"room":"Name","area":NUMBER,"floor":"1","type":"Office"}]. Types: Office,Conference,Classroom,Retail,Restaurant,Kitchen,Hotel Room,Residential,Server Room,Gym / Fitness,Lobby / Atrium,Warehouse,Corridor,Mechanical Rm,Custom. If none found return [].'}]}]})});
+      const data=await resp.json();
+      const raw=data.content?.map(i=>i.text||"").join("").replace(/```json|```/g,"").trim();
+      const parsed=JSON.parse(raw);
+      if(!Array.isArray(parsed)||!parsed.length){setStatus("⚠ No spaces found");setLoading(false);return;}
+      onExtract(parsed.map((r,i)=>{const type=r.type||"Office";return calcRow({id:Date.now()+i,room:r.room||"Room",floor:String(r.floor||"1"),type,area:Number(r.area)||0,sfton:presets[type]??400,oaPct:12});}));
+      setStatus("✓ "+parsed.length+" spaces extracted");
+    }catch(e){setStatus("✗ Error — check PDF");}
+    setLoading(false);setTimeout(()=>setStatus(""),4000);
+  };
+  const onDragOver=e=>{e.preventDefault();e.stopPropagation();setDragging(true);};
+  const onDragLeave=e=>{e.preventDefault();e.stopPropagation();setDragging(false);};
+  const onDrop=e=>{e.preventDefault();e.stopPropagation();setDragging(false);const f=e.dataTransfer.files[0];if(f)processFile(f);};
+  const borderColor=dragging?C.accent:status.startsWith("✓")?"#6EE7B7":status.startsWith("✗")?"#FCA5A5":C.border;
+  const bgColor=dragging?C.accentLight:status.startsWith("✓")?"#F0FDF4":status.startsWith("✗")?"#FEF2F2":"#F8FAFC";
+  return(
+    <div
+      onDragOver={onDragOver} onDragEnter={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+      onClick={()=>!loading&&fileRef.current.click()}
+      style={{border:"2px dashed "+borderColor,borderRadius:12,background:bgColor,padding:"28px 20px",cursor:loading?"not-allowed":"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.15s",minHeight:130,textAlign:"center"}}>
+      <span style={{fontSize:36,lineHeight:1}}>{loading?"⏳":dragging?"📂":status.startsWith("✓")?"✅":status.startsWith("✗")?"❌":"📄"}</span>
+      <div>
+        <div style={{fontSize:13,fontWeight:600,color:dragging?C.accent:status.startsWith("✓")?"#059669":status.startsWith("✗")?"#DC2626":C.text,marginBottom:3}}>
+          {loading?status:dragging?"Drop PDF to extract spaces":status||"Drag & drop a floor plan PDF here"}
+        </div>
+        {!loading&&!status&&!dragging&&<div style={{fontSize:11,color:C.textMuted}}>or click to browse — AI detects rooms and areas and adds them to the load table</div>}
+      </div>
+      {loading&&<div style={{width:18,height:18,borderRadius:"50%",border:"2px solid "+C.accent,borderTopColor:"transparent",animation:"spin 0.8s linear infinite"}}/>}
+      <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>{if(e.target.files[0])processFile(e.target.files[0]);e.target.value="";}}/>
+    </div>
+  );
+}
+
+function SDLoadCalcs({sdState,setSdState,projName}){
+  const {selectedSystems,presets,rooms,equipState}=sdState;
+  const setRooms=fn=>setSdState(p=>({...p,rooms:typeof fn==="function"?fn(p.rooms):fn}));
+  const setEq=fn=>setSdState(p=>({...p,equipState:typeof fn==="function"?fn(p.equipState):fn}));
+  const setSys=v=>setSdState(p=>({...p,selectedSystems:v}));
+  const tot=rooms.reduce((a,r)=>({area:a.area+(Number(r.area)||0),tons:r2(a.tons+(r.tons||0)),cfm:a.cfm+(r.cfm||0),oaCfm:a.oaCfm+(r.oaCfm||0)}),{area:0,tons:0,cfm:0,oaCfm:0});
+  const upd=(id,k,v)=>setRooms(p=>p.map(r=>{if(r.id!==id)return r;const u={...r,[k]:v};if(k==="type")u.sfton=presets[v]??400;return calcRow(u);}));
+  const del=id=>setRooms(p=>p.filter(r=>r.id!==id));
+  const add=()=>setRooms(p=>[...p,calcRow({id:Date.now(),room:"New Room",floor:"1",type:"Office",area:0,sfton:400,oaPct:12})]);
+  const toggle=id=>setSys(selectedSystems.includes(id)?selectedSystems.filter(x=>x!==id):[...selectedSystems,id]);
+  return <div>
+    <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+      <button onClick={()=>exportCSV(sdState,projName)} style={{...s.btnGreen,display:"flex",alignItems:"center",gap:6,fontSize:12}}>⬇ Export CSV</button>
+    </div>
+    <div style={s.card}><p style={s.secTitle}>📄 PDF Space Extractor</p><PDFExtractor onExtract={rows=>setRooms(p=>[...p,...rows])} presets={presets}/></div>
+    <div style={s.card}><p style={s.secTitle}>System Type Selection</p><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
+      {SYSTEM_TYPES.map(st=>{const active=selectedSystems.includes(st.id);return <div key={st.id} onClick={()=>toggle(st.id)} style={{display:"flex",alignItems:"center",gap:7,padding:"7px 10px",borderRadius:8,border:"2px solid "+(active?C.accent:C.border),background:active?C.accentLight:C.surface,cursor:"pointer",userSelect:"none"}}>
+        <div style={{width:16,height:16,borderRadius:4,border:"2px solid "+(active?C.accent:C.border),background:active?C.accent:"white",display:"flex",alignItems:"center",justifyContent:"center"}}>{active&&<span style={{color:"white",fontSize:10}}>✓</span>}</div>
+        <span style={{fontSize:11,fontWeight:active?600:400,color:active?C.accent:C.text}}>{st.label}</span>
+      </div>;})}
+    </div></div>
+    {selectedSystems.length>0&&<div style={s.card}><SystemEquipPanel selected={selectedSystems} totalTons={tot.tons} totalCfm={tot.cfm} totalOaCfm={tot.oaCfm} eq={equipState} setEq={setEq}/></div>}
+    <div style={s.card}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div><p style={{...s.secTitle,marginBottom:2}}>SF / Ton Presets</p><p style={{fontSize:11,color:C.textLight,margin:0}}>Edit any value — all matching rows recalculate instantly</p></div>
+        <button style={{...s.btnOut,fontSize:12,padding:"5px 12px"}} onClick={()=>{setSdState(p=>({...p,presets:{...DEFAULT_SF_TON},rooms:p.rooms.map(r=>calcRow({...r,sfton:DEFAULT_SF_TON[r.type]??r.sfton}))}));}}>Reset Defaults</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:8,marginBottom:4}}>
+        {Object.entries(sdState.presets).map(([type,val])=>(
+          <div key={type} style={{background:C.surfaceAlt,borderRadius:8,padding:"8px 11px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+            <span style={{fontSize:12,color:C.textMuted,whiteSpace:"nowrap",flexShrink:0}}>{type}</span>
+            <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <input type="number" value={val} onChange={e=>{const num=Number(e.target.value);setSdState(p=>({...p,presets:{...p.presets,[type]:num},rooms:p.rooms.map(r=>r.type===type?calcRow({...r,sfton:num}):r)}));}} style={{...s.input,width:64,padding:"4px 7px",textAlign:"right",fontSize:12}}/>
+              <span style={{fontSize:11,color:C.textLight}}>sf/t</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div style={s.card}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}><p style={{...s.secTitle,marginBottom:0}}>Preliminary Load Table</p><button style={s.btnOut} onClick={add}>+ Add Row</button></div>
+      <div style={{overflowX:"auto"}}><table style={{...s.table,fontSize:12}}><thead><tr>
+        <th style={{...s.th,padding:"6px 8px"}}>Room</th><th style={{...s.th,padding:"6px 8px"}}>Flr</th><th style={{...s.th,padding:"6px 8px"}}>Type</th><th style={{...s.th,padding:"6px 8px",textAlign:"right"}}>Area</th><th style={{...s.th,padding:"6px 8px",textAlign:"right"}}>sf/Ton</th><th style={{...s.th,padding:"6px 8px",textAlign:"right",color:C.accent}}>Tons</th><th style={{...s.th,padding:"6px 8px",textAlign:"right",color:C.accent}}>CFM</th><th style={{...s.th,padding:"6px 8px",textAlign:"right"}}>OA%</th><th style={{...s.th,padding:"6px 8px",textAlign:"right",color:"#059669"}}>OA CFM</th><th style={{...s.th,padding:"6px 8px"}}></th>
+      </tr></thead><tbody>{rooms.map(r=><tr key={r.id}>
+        <td style={{...s.td,padding:"4px 6px"}}><input style={{...s.input,width:120,padding:"3px 6px",fontSize:12}} value={r.room} onChange={e=>upd(r.id,"room",e.target.value)}/></td>
+        <td style={{...s.td,padding:"4px 6px"}}><input style={{...s.input,width:34,padding:"3px 5px",fontSize:12}} value={r.floor} onChange={e=>upd(r.id,"floor",e.target.value)}/></td>
+        <td style={{...s.td,padding:"4px 6px"}}><select style={{...s.select,width:130,padding:"3px 6px",fontSize:12}} value={r.type} onChange={e=>upd(r.id,"type",e.target.value)}>{Object.keys(DEFAULT_SF_TON).map(k=><option key={k}>{k}</option>)}</select></td>
+        <td style={{...s.td,padding:"4px 6px",textAlign:"right"}}><input style={{...s.input,width:70,padding:"3px 6px",fontSize:12,textAlign:"right"}} type="number" value={r.area} onChange={e=>upd(r.id,"area",e.target.value)}/></td>
+        <td style={{...s.td,padding:"4px 6px",textAlign:"right"}}><input style={{...s.input,width:58,padding:"3px 6px",fontSize:12,textAlign:"right"}} type="number" value={r.sfton} onChange={e=>upd(r.id,"sfton",e.target.value)}/></td>
+        <td style={{...s.td,padding:"4px 6px",textAlign:"right",fontWeight:700,color:C.accent}}>{r.tons}</td>
+        <td style={{...s.td,padding:"4px 6px",textAlign:"right",fontWeight:700,color:C.accent}}>{r.cfm.toLocaleString()}</td>
+        <td style={{...s.td,padding:"4px 6px",textAlign:"right"}}><input style={{...s.input,width:44,padding:"3px 5px",fontSize:12,textAlign:"right"}} type="number" value={r.oaPct} onChange={e=>upd(r.id,"oaPct",e.target.value)}/></td>
+        <td style={{...s.td,padding:"4px 6px",textAlign:"right",fontWeight:700,color:"#059669"}}>{r.oaCfm.toLocaleString()}</td>
+        <td style={{...s.td,padding:"4px 6px"}}><button onClick={()=>del(r.id)} style={{background:"none",border:"none",color:C.textLight,cursor:"pointer"}}>✕</button></td>
+      </tr>)}</tbody><tfoot><tr style={{background:C.surfaceAlt}}>
+        <td style={{...s.td,padding:"5px 8px",fontWeight:700}} colSpan={3}>TOTALS</td>
+        <td style={{...s.td,padding:"5px 8px",fontWeight:700,textAlign:"right"}}>{tot.area.toLocaleString()}</td>
+        <td style={{...s.td,padding:"5px 8px"}}></td>
+        <td style={{...s.td,padding:"5px 8px",fontWeight:700,textAlign:"right",color:C.accent}}>{tot.tons}</td>
+        <td style={{...s.td,padding:"5px 8px",fontWeight:700,textAlign:"right",color:C.accent}}>{tot.cfm.toLocaleString()}</td>
+        <td style={{...s.td,padding:"5px 8px"}}></td>
+        <td style={{...s.td,padding:"5px 8px",fontWeight:700,textAlign:"right",color:"#059669"}}>{tot.oaCfm.toLocaleString()}</td>
+        <td style={{...s.td,padding:"5px 8px"}}></td>
+      </tr></tfoot></table></div>
+    </div>
+  </div>;
+}
+
+// ── PSYCHROMETRIC CHART ───────────────────────────────────
+function PsychChart({points,elev}){
+  const W=900, H=580;
+  const padL=50, padR=70, padT=40, padB=50;
+  const cw=W-padL-padR, ch=H-padT-padB;
+
+  // °F range mapped — chart is portrait-ish with steep WB lines
+  const DBT_MIN=20, DBT_MAX=120;
+  const W_MIN=0, W_MAX=0.030; // lb/lb
+
+  const patm=14.696*Math.pow(1-0.0000068756*(parseFloat(elev)||0),5.2559);
+
+  const tx=dbt=>padL+((dbt-DBT_MIN)/(DBT_MAX-DBT_MIN))*cw;
+  const ty=w  =>padT+ch-((w-W_MIN)/(W_MAX-W_MIN))*ch;
+
+  // Saturation W at dbt
+  const Wsat=dbt=>{
+    const Tc=(dbt-32)*5/9;
+    const Pws=Math.exp(16.6536-4030.18/(Tc+235.67))*0.000145038;
+    return 0.62198*Pws/(patm-Pws);
+  };
+
+  // Enthalpy h = 0.240*T + W*(1061+0.444*T)
+  // W from h,T: W=(h-0.240*T)/(1061+0.444*T)
+  const Wfromhd=(h,dbt)=>(h-0.240*dbt)/(1061+0.444*dbt);
+
+  // WB psychrometric eq: W = Wsat(wb) - 0.240*(dbt-wb)/(1061+0.444*dbt)
+  const Wfromwb=(wb,dbt)=>Wsat(wb)-0.240*(dbt-wb)/(1061+0.444*dbt);
+
+  // Saturation curve
+  const satPts=[];
+  for(let d=DBT_MIN;d<=DBT_MAX;d+=0.5){
+    const w=Wsat(d);
+    if(w>=W_MIN&&w<=W_MAX+0.001) satPts.push([tx(d),ty(Math.min(w,W_MAX))]);
+  }
+  const satD=satPts.map((p,i)=>(i===0?"M":"L")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+  // close to top-left corner for fill
+  const satFill=satD+` L${tx(DBT_MIN).toFixed(1)},${padT} Z`;
+
+  // Enthalpy lines — GREEN, steep diagonal (like reference)
+  const hLines=[];
+  for(let h=5;h<=60;h+=5){
+    const pts=[];
+    for(let d=DBT_MIN;d<=DBT_MAX;d+=1){
+      const w=Wfromhd(h,d);
+      if(w>=W_MIN&&w<=W_MAX+0.001) pts.push([tx(d),ty(Math.min(w,W_MAX))]);
+    }
+    if(pts.length>1) hLines.push({h,pts});
+  }
+
+  // WB lines — also GREEN diagonal (parallel to enthalpy, slightly different slope)
+  const wbLines=[];
+  for(let wb=20;wb<=110;wb+=5){
+    const pts=[];
+    for(let d=wb;d<=DBT_MAX;d+=0.5){
+      const w=Wfromwb(wb,d);
+      if(w>=W_MIN-0.001&&w<=W_MAX+0.001){
+        pts.push([tx(d),ty(Math.max(W_MIN,Math.min(w,W_MAX)))]);
+      } else if(w<W_MIN) break;
+    }
+    // also extend to where it hits w=0
+    if(pts.length>1) wbLines.push({wb,pts});
+  }
+
+  // RH curves — RED curved lines
+  const rhCurves=[];
+  for(let rh=10;rh<=90;rh+=10){
+    const pts=[];
+    for(let d=DBT_MIN;d<=DBT_MAX;d+=1){
+      const w=(rh/100)*Wsat(d);
+      if(w>=W_MIN&&w<=W_MAX) pts.push([tx(d),ty(w)]);
+    }
+    if(pts.length>1) rhCurves.push({rh,pts});
+  }
+
+  // Specific volume lines — CYAN dashed (v = 0.3704*(T+459.67)/(patm-Pw)*approx)
+  const volLines=[];
+  for(let v=12.5;v<=15;v+=0.5){
+    const pts=[];
+    for(let d=DBT_MIN;d<=DBT_MAX;d+=1){
+      // v = 0.3704*(T+459.67)/(patm-Pw), Pw=W*patm/(0.62198+W)
+      // Solve for W: W = (0.3704*(T+459.67)/v - patm) * (-0.62198) / (patm - 0.3704*(T+459.67)/v) ... simpler:
+      // 0.3704*(T+459.67) = v*(patm - Pw) => Pw = patm - 0.3704*(T+459.67)/v
+      const Pw=patm-0.3704*(d+459.67)/v;
+      const w=0.62198*Pw/(patm-Pw);
+      if(w>=W_MIN&&w<=W_MAX) pts.push([tx(d),ty(w)]);
+    }
+    if(pts.length>1) volLines.push({v:v.toFixed(1),pts});
+  }
+
+  // DBT ticks
+  const dbtTicks=[];
+  for(let d=20;d<=120;d+=5) dbtTicks.push(d);
+
+  // W ticks (right axis) in grains for reference, display lb/lb
+  const wTicks=[];
+  for(let w=0;w<=0.030;w+=0.002) wTicks.push(parseFloat(w.toFixed(3)));
+
+  // Enthalpy axis labels along saturation curve top-left
+  const hAxisPts=hLines.map(({h,pts})=>{
+    // find where the enthalpy line intersects saturation or left edge
+    return{h,pt:pts[0]};
+  });
+
+  // State points
+  const ptDefs=[
+    {key:"oa",label:"OA",color:"#DC2626",name:"Outdoor Air"},
+    {key:"ma",label:"MA",color:"#D97706",name:"Mixed Air"},
+    {key:"sa",label:"SA",color:"#1D4ED8",name:"Supply Air"},
+    {key:"ra",label:"RA",color:"#059669",name:"Return Air"},
+  ];
+  const ptCoords=ptDefs.map(d=>{
+    const p=points[d.key];
+    if(!p||p.Wlb===undefined) return null;
+    const w=Math.max(W_MIN,Math.min(W_MAX,p.Wlb));
+    const dbt=Math.max(DBT_MIN,Math.min(DBT_MAX,p.dbt));
+    return{...d,x:tx(dbt),y:ty(w),p};
+  }).filter(Boolean);
+
+  const processLine=ptCoords.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+  const mkPath=pts=>pts.map((p,i)=>(i===0?"M":"L")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+
+  return <div style={s.card}>
+    <p style={s.secTitle}>Psychrometric Chart</p>
+    <div style={{overflowX:"auto"}}>
+    <svg width={W} height={H} style={{background:"#fff",borderRadius:8,border:"1px solid #ddd",display:"block"}}>
+
+      {/* Saturation fill */}
+      <path d={satFill} fill="#f0f7ff" opacity="0.6"/>
+
+      {/* Enthalpy lines — green diagonal */}
+      {hLines.map(({h,pts})=><g key={"h"+h}>
+        <path d={mkPath(pts)} fill="none" stroke="#4ade80" strokeWidth="0.8"/>
+        {pts[0]&&pts[0][1]<=padT+ch&&<text x={pts[0][0]-3} y={pts[0][1]-2} fontSize="8" fill="#16a34a" textAnchor="end">{h}</text>}
+      </g>)}
+
+      {/* WB lines — green diagonal, slightly bolder */}
+      {wbLines.map(({wb,pts})=>{
+        const showLabel=wb%10===0;
+        return <g key={"wb"+wb}>
+          <path d={mkPath(pts)} fill="none" stroke="#22c55e" strokeWidth={showLabel?1.1:0.6}/>
+          {pts[0]&&showLabel&&<text x={pts[0][0]-2} y={pts[0][1]+1} fontSize="8.5" fill="#15803d" textAnchor="end" fontWeight="600">{wb}</text>}
+        </g>;
+      })}
+
+      {/* RH curves — red/dark red */}
+      {rhCurves.map(({rh,pts})=>{
+        const d=mkPath(pts);
+        const mid=pts[Math.floor(pts.length*0.6)];
+        return <g key={"rh"+rh}>
+          <path d={d} fill="none" stroke="#ef4444" strokeWidth="1.1"/>
+          {mid&&<text x={mid[0]+2} y={mid[1]-3} fontSize="8.5" fill="#b91c1c" fontWeight="600">{rh}%</text>}
+        </g>;
+      })}
+
+      {/* Specific volume lines — cyan dashed */}
+      {volLines.map(({v,pts})=>{
+        const mid=pts[Math.floor(pts.length/2)];
+        return <g key={"v"+v}>
+          <path d={mkPath(pts)} fill="none" stroke="#06b6d4" strokeWidth="0.8" strokeDasharray="5,3"/>
+          {mid&&<text x={mid[0]+2} y={mid[1]-2} fontSize="7.5" fill="#0891b2">{v}</text>}
+        </g>;
+      })}
+
+      {/* Saturation curve */}
+      <path d={satD} fill="none" stroke="#1d4ed8" strokeWidth="2.5"/>
+
+      {/* Enthalpy axis labels along left edge */}
+      {hAxisPts.map(({h,pt})=>pt&&pt[0]<=padL+10&&<text key={"ha"+h} x={padL-4} y={pt[1]+3} fontSize="8" fill="#15803d" textAnchor="end">{h}</text>)}
+
+      {/* DBT axis — bottom */}
+      {dbtTicks.map(d=><g key={"dt"+d}>
+        <line x1={tx(d)} y1={padT+ch} x2={tx(d)} y2={padT+ch+(d%10===0?8:4)} stroke="#555" strokeWidth="1"/>
+        {d%10===0&&<text x={tx(d)} y={padT+ch+18} textAnchor="middle" fontSize="10" fill="#374151">{d}</text>}
+        <line x1={tx(d)} y1={padT} x2={tx(d)} y2={padT+ch} stroke="#e5e7eb" strokeWidth="0.4"/>
+      </g>)}
+
+      {/* W axis — right */}
+      {wTicks.map(w=><g key={"wt"+w}>
+        <line x1={padL+cw} y1={ty(w)} x2={padL+cw+6} y2={ty(w)} stroke="#555" strokeWidth="1"/>
+        <text x={padL+cw+10} y={ty(w)+3.5} fontSize="9" fill="#374151">{w.toFixed(3)}</text>
+        <line x1={padL} y1={ty(w)} x2={padL+cw} y2={ty(w)} stroke="#e5e7eb" strokeWidth="0.4"/>
+      </g>)}
+
+      {/* Border */}
+      <rect x={padL} y={padT} width={cw} height={ch} fill="none" stroke="#9ca3af" strokeWidth="1.2"/>
+
+      {/* Axis labels */}
+      <text x={padL+cw/2} y={H-8} textAnchor="middle" fontSize="12" fontWeight="600" fill="#374151">Dry Bulb Temperature — °F   ·   Pressure: {patm.toFixed(3)} psia</text>
+      <text x={W-12} y={padT+ch/2} textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151" transform={`rotate(90,${W-12},${padT+ch/2})`}>Humidity Ratio — lb / lb dry air</text>
+      <text x={padL+cw/2} y={padT-14} textAnchor="middle" fontSize="13" fontWeight="700" fill="#1e3a5f">Psychrometric Chart</text>
+
+      {/* WB / Enthalpy axis label top-left diagonal */}
+      <text x={padL-8} y={padT+20} fontSize="9" fill="#15803d" fontWeight="700" textAnchor="end">h / WB</text>
+
+      {/* Process line */}
+      {ptCoords.length>1&&<polyline points={processLine} fill="none" stroke="#1f2937" strokeWidth="2.2" strokeDasharray="8,4"/>}
+
+      {/* State points */}
+      {ptCoords.map(pt=>{
+        const flip=pt.x>W-padR-110;
+        const lx=flip?pt.x-92:pt.x+10;
+        const ly=pt.y<padT+55?pt.y+18:pt.y-50;
+        return <g key={pt.key}>
+          <circle cx={pt.x} cy={pt.y} r={8} fill={pt.color} stroke="white" strokeWidth="2"/>
+          <text x={pt.x} y={pt.y+4} textAnchor="middle" fontSize="9" fontWeight="800" fill="white">{pt.label}</text>
+          <rect x={lx-2} y={ly-13} width={94} height={46} rx={3} fill="white" stroke={pt.color} strokeWidth="1.2" opacity="0.95"/>
+          <text x={lx+2} y={ly} fontSize="9.5" fontWeight="700" fill={pt.color}>{pt.name}</text>
+          <text x={lx+2} y={ly+12} fontSize="9" fill="#374151">{pt.p.dbt}°F DB / {pt.p.Twb}°F WB</text>
+          <text x={lx+2} y={ly+23} fontSize="9" fill="#374151">W={pt.p.Wlb} · h={pt.p.h} Btu/lb</text>
+          <text x={lx+2} y={ly+34} fontSize="9" fill="#374151">RH={pt.p.rh}% · DP={pt.p.Tdp}°F</text>
+        </g>;
+      })}
+
+      {/* Legend box */}
+      <g transform={`translate(${padL+8},${padT+8})`}>
+        <rect x={-3} y={-3} width={192} height={72} rx={4} fill="white" stroke="#e5e7eb" strokeWidth="1" opacity="0.93"/>
+        {[
+          {c:"#1d4ed8",w:2.5,dash:"",lbl:"Saturation Curve"},
+          {c:"#22c55e",w:1.1,dash:"",lbl:"Enthalpy / WB Lines"},
+          {c:"#ef4444",w:1.1,dash:"",lbl:"Relative Humidity Curves"},
+          {c:"#06b6d4",w:0.9,dash:"5,3",lbl:"Specific Volume (ft³/lb)"},
+        ].map((l,i)=><g key={l.lbl} transform={`translate(0,${i*16})`}>
+          <line x1="0" y1="7" x2="22" y2="7" stroke={l.c} strokeWidth={l.w} strokeDasharray={l.dash}/>
+          <text x="26" y="11" fontSize="9.5" fill="#374151">{l.lbl}</text>
+        </g>)}
+      </g>
+
+    </svg>
+    </div>
+  </div>;
+}
+
+// ── PSYCHROMETRIC ─────────────────────────────────────────
+function calcPsych(dbt,rh,elev){
+  const T=parseFloat(dbt)||0,RH=Math.max(0.01,Math.min(1,(parseFloat(rh)||50)/100));
+  const patm=14.696*Math.pow(1-0.0000068756*(parseFloat(elev)||0),5.2559);
+  const Tc=(T-32)*5/9,Pws=Math.exp(16.6536-4030.18/(Tc+235.67))*0.000145038,Pw=RH*Pws,W=0.62198*Pw/(patm-Pw);
+  const h=r2(0.240*T+W*(1061+0.444*T));
+  const lnRH=Math.log(RH),num=243.04*(lnRH+17.625*Tc/(243.04+Tc));
+  const Tdp=r2((num/(17.625-lnRH-17.625*Tc/(243.04+Tc)))*9/5+32);
+  return{dbt:r2(T),rh:r2(RH*100),h,Tdp,Twb:r2(T-(T-Tdp)/3.0),v:r2((0.3704*(T+459.67))/(patm-Pw)),Wlb:r2(W),patm:r2(patm)};
+}
+function Psychrometric(){
+  const [oa,setOa]=useState({dbt:93,rh:43});const [ra,setRa]=useState({dbt:75,rh:50});const [sa,setSa]=useState({dbt:55,rh:97});
+  const [elev,setElev]=useState(0);const [saCfm,setSaCfm]=useState(0);const [pctOA,setPctOA]=useState(0);
+  const oaP=calcPsych(oa.dbt,oa.rh,elev),raP=calcPsych(ra.dbt,ra.rh,elev),saP=calcPsych(sa.dbt,sa.rh,elev);
+  const pct=Math.min(1,Math.max(0,pctOA/100)),maDbt=r2(oaP.dbt*pct+raP.dbt*(1-pct)),maW=r2(oaP.Wlb*pct+raP.Wlb*(1-pct));
+  const maRh=r2(((maW/(0.62198+maW))/(Math.exp(16.6536-4030.18/(((maDbt-32)*5/9)+235.67))*0.000145038))*100);
+  const maP=calcPsych(maDbt,Math.min(99,maRh),elev);
+  const qSens=saCfm>0?r2(1.1*(ra.dbt-sa.dbt)*saCfm):0,qCoil=saCfm>0?r2(4.5*saCfm*(raP.h-saP.h)):0;
+  const SI=({v,onChange,color})=><input type="number" value={v} onChange={e=>onChange(e.target.value)} style={{width:50,border:"1px solid #bbb",borderRadius:3,padding:"2px 4px",fontSize:12,fontWeight:700,color:color||"#c00",background:"#fff",outline:"none",textAlign:"center"}}/>;
+  return <div>
+    <div style={{...s.card,padding:"12px 20px",marginBottom:16,display:"flex",gap:24,alignItems:"center",flexWrap:"wrap"}}>
+      <div><label style={{...s.label,marginBottom:2}}>Elevation (ft)</label><input style={{...s.input,width:90}} type="number" value={elev} onChange={e=>setElev(e.target.value)}/></div>
+      <div style={{fontSize:12,color:C.textMuted}}>Atm: <strong>{oaP.patm} psia</strong></div>
+      <div style={{fontSize:12,color:C.textMuted}}>Coil Load: <strong style={{color:C.accent}}>{qCoil.toLocaleString()} Btu/h</strong></div>
+      <div style={{fontSize:12,color:C.textMuted}}>Sensible: <strong style={{color:"#c44"}}>{qSens.toLocaleString()} Btu/h</strong></div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:16,marginBottom:16}}>
+      {[["Outdoor Air",oa,setOa,oaP,false],["Return Air",ra,setRa,raP,false],["Supply Air",sa,setSa,saP,true]].map(([label,state,setState,p,hi])=><div key={label} style={{border:"2px solid "+(hi?"#3B82F6":"#E2E6EA"),borderRadius:10,padding:"12px 14px",background:"#fff"}}>
+        <div style={{fontSize:11,fontWeight:700,color:hi?C.accent:C.textMuted,marginBottom:8,textTransform:"uppercase"}}>{label}</div>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}><SI v={state.dbt} onChange={v=>setState(x=>({...x,dbt:v}))} color="#c00"/><span style={{fontSize:11}}>°F DB</span></div>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}><SI v={state.rh} onChange={v=>setState(x=>({...x,rh:v}))} color="#00a"/><span style={{fontSize:11}}>% RH</span></div>
+        <div style={{fontSize:11,color:"#444",lineHeight:1.7}}><div>h = {p.h} Btu/lb</div><div>W = {p.Wlb} lb/lb</div><div>WB = {p.Twb}°F</div><div>DP = {p.Tdp}°F</div></div>
+      </div>)}
+      <div style={{border:"2px solid #E2E6EA",borderRadius:10,padding:"12px 14px",background:"#EFF6FF"}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.textMuted,marginBottom:8,textTransform:"uppercase"}}>Mixed Air</div>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}><input type="number" value={pctOA} onChange={e=>setPctOA(e.target.value)} style={{width:50,border:"1px solid #bbb",borderRadius:3,padding:"2px 4px",fontSize:12,fontWeight:700,color:"#333",background:"#fff",outline:"none",textAlign:"center"}}/><span style={{fontSize:11}}>% OA</span></div>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}><input type="number" value={saCfm} onChange={e=>setSaCfm(e.target.value)} style={{width:70,border:"1px solid #bbb",borderRadius:3,padding:"2px 4px",fontSize:12,fontWeight:700,color:"#333",background:"#fff",outline:"none",textAlign:"center"}}/><span style={{fontSize:11}}>CFM</span></div>
+        <div style={{fontSize:11,color:"#444",lineHeight:1.7}}><div>DB = {maDbt}°F</div><div>RH = {r2(maRh)}%</div><div>h = {maP.h} Btu/lb</div><div>WB = {maP.Twb}°F</div></div>
+      </div>
+    </div>
+    <div style={s.card}><p style={s.secTitle}>State Point Summary</p><table style={s.table}><thead><tr><th style={s.th}>Point</th><th style={s.th}>DBT °F</th><th style={s.th}>RH %</th><th style={s.th}>WB °F</th><th style={s.th}>DP °F</th><th style={s.th}>h Btu/lb</th><th style={s.th}>W lb/lb</th><th style={s.th}>v ft3/lb</th></tr></thead><tbody>
+      {[["Outdoor Air",oaP],["Mixed Air",maP],["Supply Air",saP],["Return / Room",raP]].map(([l,p])=><tr key={l}><td style={{...s.td,fontWeight:500}}>{l}</td><td style={s.td}>{p.dbt}</td><td style={s.td}>{p.rh}</td><td style={s.td}>{p.Twb}</td><td style={s.td}>{p.Tdp}</td><td style={s.td}>{p.h}</td><td style={s.td}>{p.Wlb}</td><td style={s.td}>{p.v}</td></tr>)}
+    </tbody></table></div>
+
+  </div>;
+}
+
+// ── PUMP SIZING ───────────────────────────────────────────
+const REF_PD=[["ELBOW 90°","0.30",""],["ELBOW 45°","0.23",""],["STRAIGHT THRU TEE","0.60",""],["TURN THRU TEE","1.80",""],["GATE VALVE","0.19",""],["BUTTERFLY VALVE","0.46",""],["CHECK VALVE (SWING)","2.50",""],["BALL VALVE","0.04",""],["GLOBE VALVE","5.00",""],["TRIPLE DUTY VALVE","","0.92"],["PUMP SUCT DIFF W/STRAINER","","1.62"],["AIR SEPARATOR","","2.25"],["TOWER INLET HEAD REQ'D","","17.33"],["CHILLER PD, CONDENSER","","6.90"],["CHILLER PD, EVAPORATOR","","7.00"],["3-WAY MODULATING VALVE","","1.84"]];
+const EQ_LBL=["Finned tube Radiation","Unit Heaters","Cabinet Unit Heaters","Convectors","Heat Pumps","Reheat Coils","Air Handling Units","Radiant Panels","","",""];
+const FIT_LBL=["Boiler","Heat Exchanger","Chiller","Air Separator","Heating Coil","Cooling Coil","Control Valves (Coil PD x 1.25)","Strainers","Balancing Valves","Check Valves","Shut-off Valves","Glycol 50% EG (x1.34 system head)","",""];
+
+function PumpSizing({sdState,pumpLinked,setPumpLinked,pumpSource,setPumpSource}){
+  const [eqGPM,setEqGPM]=useState(EQ_LBL.map(()=>""));
+  const [linFt,setLinFt]=useState("");const [fricRate,setFricRate]=useState(3);
+  const [fitMode,setFitMode]=useState("30pct");const [fitFt,setFitFt]=useState("");
+  const [fitItems,setFitItems]=useState(FIT_LBL.map(()=>""));
+  const [sf,setSf]=useState(15);const [numP,setNumP]=useState(1);const [overPct,setOverPct]=useState(120);const [eff,setEff]=useState(75);
+  const sdTot=sdState.rooms.reduce((a,r)=>({tons:r2(a.tons+(r.tons||0))}),{tons:0});
+  const gpmSrc=getGpmSources(sdState.selectedSystems,sdTot.tons,sdState.equipState);
+  const linkedGpm=pumpLinked&&pumpSource?(gpmSrc.find(x=>x.id===pumpSource)?.gpm??0):null;
+  const lc=pumpLinked&&pumpSource?{numPL:pumpSource==="wc_chw_chw"?sdState.equipState.wcChwPumps:pumpSource==="wc_chw_cw"?sdState.equipState.wcCwPumps:pumpSource==="ac_chw_chw"?sdState.equipState.acPumps:pumpSource==="cond_loop"?sdState.equipState.cwPumps2:1,overPctL:sdState.equipState.oversize?120:100}:null;
+  const eN=lc?lc.numPL:numP,eOP=lc?lc.overPctL:overPct;
+  const effGPM=eqGPM.map((v,i)=>i===6&&pumpLinked&&linkedGpm!==null?String(linkedGpm):v);
+  const totalGPM=r2(effGPM.reduce((a,v)=>a+nv(v),0));
+  const mL=r2(nv(linFt)*nv(fricRate)/100),fL=r2((fitMode==="30pct"?nv(linFt)*0.3:nv(fitFt))*nv(fricRate)/100);
+  const rawHead=r2(mL+fL+fitItems.reduce((a,v)=>a+nv(v),0));
+  const totalHead=r2(rawHead*(1+nv(sf)/100));
+  const pumpGPM=r2((totalGPM*(eOP/100))/eN),pumpPSI=r2(totalHead/2.31),pumpHP=r2(pumpGPM*totalHead/(3960*(eff/100)));
+  const td={border:"1px solid #b0b8c1",padding:"2px 6px",verticalAlign:"middle"};
+  const pi={...td,background:"#c5e0f5"};
+  const IC=({v,onChange,ro})=><input value={v} onChange={e=>onChange&&onChange(e.target.value)} readOnly={!!ro} style={{border:"none",background:ro?"#DBEAFE":"transparent",outline:"none",width:"100%",textAlign:"right",fontSize:12,color:ro?C.accent:"#000",padding:0}}/>;
+  const noSd=sdState.selectedSystems.length===0;
+  return <div>
+    <div style={{background:pumpLinked?"#EFF6FF":"#F8FAFC",border:"1.5px solid "+(pumpLinked?C.accent:C.border),borderRadius:10,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+      <label style={{display:"flex",alignItems:"center",gap:8,cursor:noSd?"not-allowed":"pointer",userSelect:"none",opacity:noSd?0.5:1}} onClick={()=>{if(noSd)return;const n=!pumpLinked;setPumpLinked(n);if(n&&!pumpSource&&gpmSrc.length>0){const f=gpmSrc.find(x=>!x.disabled);if(f)setPumpSource(f.id);}}}>
+        <div style={{width:18,height:18,borderRadius:4,border:"2px solid "+(pumpLinked?C.accent:C.border),background:pumpLinked?C.accent:"white",display:"flex",alignItems:"center",justifyContent:"center"}}>{pumpLinked&&<span style={{color:"white",fontSize:12}}>✓</span>}</div>
+        <span style={{fontSize:13,fontWeight:600,color:pumpLinked?C.accent:C.text}}>Link to SD Calcs</span>
+      </label>
+      {noSd&&<span style={{fontSize:11,color:C.textMuted,fontStyle:"italic"}}>No systems selected in SD Calcs</span>}
+      {pumpLinked&&!noSd&&<div style={{display:"flex",alignItems:"center",gap:10,flex:1,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,color:C.textMuted}}>GPM Source:</span>
+        <select value={pumpSource} onChange={e=>setPumpSource(e.target.value)} style={{...s.select,width:"auto",minWidth:260,padding:"5px 10px",fontSize:12,borderColor:C.accent}}>
+          {gpmSrc.map(src=><option key={src.id} value={src.id} disabled={src.disabled}>{src.label}</option>)}
+        </select>
+        {linkedGpm>0&&<span style={{fontSize:12,fontWeight:700,color:"#fff",background:C.accent,padding:"3px 10px",borderRadius:6}}>{linkedGpm} GPM</span>}
+      </div>}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 260px",gap:16,alignItems:"start"}}>
+      <div style={s.card}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+        <tbody>
+        <tr><td colSpan={5} style={{...td,background:"#d9d9d9",fontWeight:700,textAlign:"center",fontSize:13}}>CLOSED SYSTEM PUMP SIZING</td></tr>
+        <tr><td colSpan={5} style={{...td,background:"#e8e8e8",fontWeight:700}}>SYSTEM CAPACITY</td></tr>
+        {EQ_LBL.map((lbl,i)=>{const ro=i===6&&pumpLinked&&linkedGpm!==null;return <tr key={i} style={ro?{background:"#EFF6FF"}:{}}><td style={{...td,paddingLeft:24,width:"55%"}}>{lbl}{ro&&<span style={{marginLeft:6,fontSize:10,background:C.accent,color:"#fff",borderRadius:3,padding:"1px 5px"}}>LINKED</span>}</td><td style={{...pi,width:"20%",background:ro?"#DBEAFE":undefined}}><IC v={effGPM[i]} onChange={ro?null:v=>{const a=[...eqGPM];a[i]=v;setEqGPM(a);}} ro={ro}/></td><td colSpan={3} style={{...td,color:"#555"}}>GPM</td></tr>;})}
+        <tr><td style={{...td,fontWeight:700,paddingLeft:14}}>Total</td><td style={{...td,color:"#c00",fontWeight:700,textAlign:"right"}}>{totalGPM}</td><td colSpan={3} style={{...td}}>GPM</td></tr>
+        <tr><td colSpan={5} style={{...td,background:"#e8e8e8",fontWeight:700}}>SYSTEM HEAD</td></tr>
+        <tr><td style={{...td,textAlign:"right",paddingRight:6,color:"#555"}}>Linear ft ×</td><td style={pi}><IC v={linFt} onChange={setLinFt}/></td><td style={{...td,color:"#555"}}>ft/100ft ×</td><td style={pi}><IC v={fricRate} onChange={setFricRate}/></td><td style={{...td,color:"#c00",fontWeight:700,textAlign:"right"}}>{mL} ft</td></tr>
+        <tr><td style={{...td,textAlign:"right",paddingRight:6}}><label><input type="radio" checked={fitMode==="30pct"} onChange={()=>setFitMode("30pct")} style={{marginRight:4}}/>30% fitting allowance</label></td><td style={{...pi,textAlign:"right",fontSize:11,color:"#888"}}>{fitMode==="30pct"?r2(mL*0.3):""}</td><td colSpan={3} style={td}></td></tr>
+        <tr><td style={{...td,textAlign:"right",paddingRight:6}}><label style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4}}><input type="radio" checked={fitMode==="separate"} onChange={()=>setFitMode("separate")}/>{fitMode==="separate"?<input value={fitFt} onChange={e=>setFitFt(e.target.value)} style={{width:50,background:"#c5e0f5",border:"1px solid #b0b8c1",borderRadius:2,padding:"1px 4px",fontSize:11,outline:"none",textAlign:"right"}}/>:"0"} ft separate ×</label></td><td style={pi}><IC v={fricRate} onChange={setFricRate}/></td><td colSpan={2} style={td}></td><td style={{...td,color:"#c00",fontWeight:700,textAlign:"right"}}>{fL} ft</td></tr>
+        {FIT_LBL.map((lbl,i)=><tr key={i}><td style={{...td,paddingLeft:24}}>{lbl}</td><td style={pi}><IC v={fitItems[i]} onChange={v=>{const a=[...fitItems];a[i]=v;setFitItems(a);}}/></td><td colSpan={3} style={{...td,color:"#555"}}>ft</td></tr>)}
+        <tr><td style={{...td,fontWeight:700,paddingLeft:14}}>Safety Factor</td><td style={pi}><IC v={sf} onChange={setSf}/></td><td colSpan={3} style={{...td,color:"#555"}}>%</td></tr>
+        <tr><td style={{...td,fontWeight:700,paddingLeft:14}}>Total Head</td><td style={{...td,color:"#c00",fontWeight:700,textAlign:"right"}}>{totalHead}</td><td colSpan={3} style={td}>ft</td></tr>
+        </tbody>
+      </table></div>
+      <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:8,padding:"12px 14px"}}>
+        <p style={{...s.secTitle,marginBottom:10}}>Reference Pressure Drops</p>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr><th style={{...s.th,padding:"4px 6px",fontSize:10}}>Component</th><th style={{...s.th,padding:"4px 6px",fontSize:10,textAlign:"center",width:32}}>K</th><th style={{...s.th,padding:"4px 6px",fontSize:10,textAlign:"center",width:40}}>ft</th></tr></thead><tbody>
+          {REF_PD.map(([l,k,h])=><tr key={l}><td style={{padding:"2px 5px",borderBottom:"1px solid "+C.border,fontSize:10.5}}>{l}</td><td style={{padding:"2px 5px",borderBottom:"1px solid "+C.border,textAlign:"center",fontWeight:k?600:400,color:k?C.text:C.textLight,fontSize:10.5}}>{k||"—"}</td><td style={{padding:"2px 5px",borderBottom:"1px solid "+C.border,textAlign:"center",fontWeight:h?700:400,color:h?C.accent:C.textLight,fontSize:10.5}}>{h||"—"}</td></tr>)}
+        </tbody></table>
+      </div>
+    </div>
+    <div style={{...s.card,padding:"16px 20px"}}>
+      <p style={s.secTitle}>Pump Configuration</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,maxWidth:500,marginBottom:16}}>
+        <div><label style={s.label}>Pumps{lc&&<span style={{marginLeft:5,fontSize:10,background:C.accent,color:"#fff",borderRadius:3,padding:"1px 5px"}}>LINKED</span>}</label><input style={{...s.input,background:lc?"#DBEAFE":C.surface}} type="number" min="1" value={eN} readOnly={!!lc} onChange={lc?null:e=>setNumP(Math.max(1,parseInt(e.target.value)||1))}/></div>
+        <div><label style={s.label}>Oversize %{lc&&<span style={{marginLeft:5,fontSize:10,background:C.accent,color:"#fff",borderRadius:3,padding:"1px 5px"}}>LINKED</span>}</label><input style={{...s.input,background:lc?"#DBEAFE":C.surface}} type="number" value={eOP} readOnly={!!lc} onChange={lc?null:e=>setOverPct(parseFloat(e.target.value)||120)}/></div>
+        <div><label style={s.label}>Efficiency %</label><input style={s.input} type="number" value={eff} onChange={e=>setEff(parseFloat(e.target.value)||75)}/></div>
+      </div>
+      {(totalGPM>0||totalHead>0)&&<div style={s.resBox}><p style={s.secTitle}>Pump Selection Summary</p><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
+        <div style={s.resItem}><div style={{fontSize:11,color:C.textMuted,marginBottom:4}}>System GPM</div><div style={{fontSize:15,fontWeight:700}}>{totalGPM.toLocaleString()}</div></div>
+        <div style={{...s.resItem,border:"2px solid "+C.accent}}><div style={{fontSize:11,color:C.accent,fontWeight:600,marginBottom:4}}>GPM/Pump</div><div style={s.resVal}>{pumpGPM.toLocaleString()}</div></div>
+        <div style={{...s.resItem,border:"2px solid "+C.accent}}><div style={{fontSize:11,color:C.accent,fontWeight:600,marginBottom:4}}>Total Head</div><div style={s.resVal}>{totalHead} ft</div><div style={{fontSize:11,color:C.textMuted}}>{pumpPSI} psi</div></div>
+        <div style={{...s.resItem,border:"2px solid "+C.accent}}><div style={{fontSize:11,color:C.accent,fontWeight:600,marginBottom:4}}>Est. HP/Pump</div><div style={s.resVal}>{pumpHP}</div></div>
+      </div></div>}
+    </div>
+  </div>;
+}
+
+// ── BOILER / HEATING ──────────────────────────────────────
+function BoilerHeating(){
+  const [htLoad,setHtLoad]=useState("200000");const [supplyT,setSupplyT]=useState("180");const [returnT,setReturnT]=useState("160");
+  const [numBoilers,setNumBoilers]=useState(2);const [numPumps,setNumPumps]=useState(2);const [oversize,setOversize]=useState(true);
+  const OF=oversize?1.2:1,dT=nv(supplyT)-nv(returnT),btuh=nv(htLoad),dBtuh=r2(btuh*OF),dMBH=r2(dBtuh/1000);
+  const hwGPM=dT>0?r2(btuh/(500*dT)):0,dGPM=r2(hwGPM*OF);
+  const IC=({label,val,set,unit})=><div><label style={s.label}>{label}</label><div style={{display:"flex",alignItems:"center",gap:6}}><input style={s.input} type="number" value={val} onChange={e=>set(e.target.value)}/>{unit&&<span style={{fontSize:12,color:C.textMuted,flexShrink:0}}>{unit}</span>}</div></div>;
+  return <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:20,alignItems:"start"}}>
+    <div style={s.card}><p style={s.secTitle}>Heating System Inputs</p><div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <IC label="Peak Heating Load" val={htLoad} set={setHtLoad} unit="Btu/hr"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <IC label="HW Supply (°F)" val={supplyT} set={setSupplyT}/>
+        <IC label="HW Return (°F)" val={returnT} set={setReturnT}/>
+      </div>
+      <div style={{background:C.accentLight,borderRadius:7,padding:"8px 12px",fontSize:12,color:C.textMuted}}>ΔT = <strong style={{color:C.accent}}>{dT}°F</strong>{dT>0&&nv(returnT)<130&&<span style={{color:C.success,marginLeft:8}}>✓ Condensing possible</span>}{dT>0&&nv(returnT)>140&&<span style={{color:C.warn,marginLeft:8}}>⚠ Return too high for condensing</span>}</div>
+      <EquipInput label="Boilers" value={numBoilers} onChange={setNumBoilers}/>
+      <EquipInput label="HW Pumps" value={numPumps} onChange={setNumPumps}/>
+      <label onClick={()=>setOversize(!oversize)} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",userSelect:"none",padding:"7px 12px",borderRadius:8,border:"1px solid "+(oversize?C.accent:C.border),background:oversize?C.accentLight:C.surface,fontSize:12,color:oversize?C.accent:C.textMuted}}>
+        <div style={{width:15,height:15,borderRadius:3,border:"2px solid "+(oversize?C.accent:C.border),background:oversize?C.accent:"white",display:"flex",alignItems:"center",justifyContent:"center"}}>{oversize&&<span style={{color:"white",fontSize:10}}>✓</span>}</div>
+        20% Oversizing
+      </label>
+    </div></div>
+    <div>
+      <div style={s.resBox}><p style={s.secTitle}>Heating System Summary</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
+          {[["Design Load",dMBH,"MBH",C.accent],["MBH / Boiler",numBoilers>0?r2(dMBH/numBoilers):0,"MBH","#7C3AED"],["Base HW GPM",hwGPM,"GPM",C.accent],["Design HW GPM",dGPM,"GPM","#0891B2"],["GPM / Pump",numPumps>0?r2(dGPM/numPumps):0,"GPM","#0891B2"],["Input Btu/hr",r2(dBtuh/0.85).toLocaleString(),"Btu/hr","#D97706"]].map(([l,v,u,c])=><div key={l} style={{...s.resItem,borderLeft:"3px solid "+c}}><div style={{fontSize:11,color:C.textMuted,marginBottom:3}}>{l}</div><div style={{fontSize:17,fontWeight:700,color:c}}>{v}<span style={{fontSize:11,fontWeight:400,color:C.textLight,marginLeft:3}}>{u}</span></div></div>)}
+        </div>
+      </div>
+      <div style={s.card}><p style={s.secTitle}>Boiler Type Reference</p><table style={{...s.table,fontSize:12}}><thead><tr><th style={s.th}>Type</th><th style={s.th}>Notes</th><th style={{...s.th,textAlign:"center"}}>Efficiency</th></tr></thead><tbody>
+        {[["Condensing Gas-Fired","Return water below 130°F required for condensing mode","95-98%"],["Non-Condensing Gas-Fired","Return water must stay above 140°F","80-85%"],["Electric HW Boiler","Near 100% — no flue needed, higher operating cost","99%"],["Modular Boiler Banks","Multiple small boilers for redundancy and turndown","90-95%"]].map(([t,n,e])=><tr key={t}><td style={{...s.td,fontWeight:600}}>{t}</td><td style={{...s.td,fontSize:11,color:C.textMuted}}>{n}</td><td style={{...s.td,textAlign:"center",fontWeight:700,color:C.accent}}>{e}</td></tr>)}
+      </tbody></table></div>
+      <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:12,padding:"16px 20px"}}><div style={{fontSize:12,fontWeight:700,color:"#C2410C",marginBottom:10}}>🔥 Condensing Boiler Guidelines</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12,color:"#9A3412"}}>
+          {[["Return Temp","Below 130°F for condensing operation"],["System Volume","Min 10 gal/MBH — add buffer tank if needed"],["Low-Loss Header","Required for multiple boilers"],["Primary/Secondary","Recommended for variable flow"],["Flue","Stainless or PVC for condensing units"],["Reset Control","Outdoor air reset recommended"]].map(([k,v])=><div key={k} style={{background:"rgba(255,255,255,0.6)",borderRadius:7,padding:"8px 10px"}}><div style={{fontWeight:700,marginBottom:2}}>{k}</div><div style={{fontSize:11}}>{v}</div></div>)}
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+// ── DESIGN CONDITIONS ─────────────────────────────────────
+function DesignConditions(){
+  const [city,setCity]=useState("");const [loading,setLoading]=useState(false);const [result,setResult]=useState(null);const [error,setError]=useState("");const [history,setHistory]=useState([]);
+  const lookup=async()=>{
+    if(!city.trim())return;setLoading(true);setError("");setResult(null);
+    try{
+      const resp=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1500,system:"You are an HVAC engineering reference. Return ONLY valid JSON with no markdown.",messages:[{role:"user",content:`Provide ASHRAE outdoor design conditions for: ${city}. Return ONLY this raw JSON (no markdown, no backticks):
+{"city":"City, State","climateZone":"4A","elevation":750,"latitude":39.9,"heating":{"db99_6":12,"db99":16,"ws99_6":25},"cooling":{"db1_wb":"95/75","db05_wb":"92/74","db1":95,"wb1":75,"mcwb":78,"dp1":68,"enthalpy1":38.5},"dehumidification":{"dp1":75,"mcdb":82,"hr1":134},"annualExtreme":{"maxDB":100,"minDB":5},"climateNotes":"Brief climate and local code notes"}`}]})});
+      const data=await resp.json();
+      const raw=data.content?.map(i=>i.text||"").join("").replace(/```json|```/g,"").trim();
+      const parsed=JSON.parse(raw);
+      setResult(parsed);setHistory(h=>[{city:parsed.city,data:parsed},...h.filter(x=>x.city!==parsed.city)].slice(0,6));
+    }catch{setError("Could not retrieve conditions. Try a more specific city name.");}
+    setLoading(false);
+  };
+  const Chip=({label,val,unit,accent})=><div style={{background:C.surface,border:"1px solid "+(accent?"#BFDBFE":C.border),borderRadius:8,padding:"10px 14px",borderLeft:"3px solid "+(accent?C.accent:C.border)}}><div style={{fontSize:10,color:C.textMuted,marginBottom:2}}>{label}</div><div style={{fontSize:17,fontWeight:700,color:accent?C.accent:C.text}}>{val}<span style={{fontSize:11,fontWeight:400,color:C.textLight,marginLeft:3}}>{unit}</span></div></div>;
+  return <div>
+    <div style={s.card}><p style={s.secTitle}>ASHRAE Outdoor Design Conditions Lookup</p>
+      <div style={{display:"flex",gap:10,marginBottom:12}}>
+        <input value={city} onChange={e=>setCity(e.target.value)} onKeyDown={e=>e.key==="Enter"&&lookup()} placeholder="e.g. Chicago, IL  or  Houston, TX  or  Denver, CO" style={{...s.input,flex:1}}/>
+        <button onClick={lookup} disabled={loading||!city.trim()} style={{...s.btn,padding:"8px 24px",opacity:loading||!city.trim()?0.5:1,display:"flex",alignItems:"center",gap:8}}>
+          {loading&&<div style={{width:14,height:14,borderRadius:"50%",border:"2px solid rgba(255,255,255,0.4)",borderTopColor:"#fff",animation:"spin 0.8s linear infinite"}}/>}
+          {loading?"Looking up...":"Look Up"}
+        </button>
+      </div>
+      {history.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {history.map(h=><button key={h.city} onClick={()=>{setCity(h.city);setResult(h.data);}} style={{padding:"3px 10px",borderRadius:20,border:"1px solid "+C.border,background:result?.city===h.city?C.accent:C.surface,color:result?.city===h.city?"#fff":C.textMuted,fontSize:11,cursor:"pointer"}}>{h.city}</button>)}
+      </div>}
+    </div>
+    {error&&<div style={{...s.card,borderColor:C.danger,background:"#FEF2F2",color:C.danger}}>{error}</div>}
+    {result&&<div>
+      <div style={{background:"#1E3A5F",borderRadius:12,padding:"16px 24px",marginBottom:16}}>
+        <div style={{fontSize:20,fontWeight:700,color:"#fff"}}>{result.city}</div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:4,display:"flex",gap:16,flexWrap:"wrap"}}>
+          <span>Climate Zone: <strong style={{color:"#93C5FD"}}>{result.climateZone}</strong></span>
+          <span>Elevation: <strong style={{color:"#93C5FD"}}>{result.elevation?.toLocaleString()} ft</strong></span>
+          <span>Latitude: <strong style={{color:"#93C5FD"}}>{result.latitude}°</strong></span>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+        <div style={s.card}><p style={{...s.secTitle,color:"#1D4ED8"}}>❄️ Heating Design</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Chip label="99.6% Heating DB" val={result.heating?.db99_6} unit="°F" accent/><Chip label="99% Heating DB" val={result.heating?.db99} unit="°F"/><Chip label="99.6% Wind Speed" val={result.heating?.ws99_6} unit="mph"/></div>
+        </div>
+        <div style={s.card}><p style={{...s.secTitle,color:"#DC2626"}}>☀️ Cooling Design</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Chip label="1% DB/MCWB" val={result.cooling?.db1_wb} unit="°F" accent/><Chip label="0.5% DB/MCWB" val={result.cooling?.db05_wb} unit="°F"/><Chip label="1% Enthalpy" val={result.cooling?.enthalpy1} unit="Btu/lb"/><Chip label="1% Dew Point" val={result.cooling?.dp1} unit="°F"/></div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+        <div style={s.card}><p style={s.secTitle}>💧 Dehumidification (1%)</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}><Chip label="Dew Point" val={result.dehumidification?.dp1} unit="°F" accent/><Chip label="MCDB" val={result.dehumidification?.mcdb} unit="°F"/><Chip label="Humidity Ratio" val={result.dehumidification?.hr1} unit="gr/lb"/></div>
+        </div>
+        <div style={s.card}><p style={s.secTitle}>📊 Annual Extremes</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Chip label="Max Dry Bulb" val={result.annualExtreme?.maxDB} unit="°F" accent/><Chip label="Min Dry Bulb" val={result.annualExtreme?.minDB} unit="°F"/></div>
+        </div>
+      </div>
+      {result.climateNotes&&<div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:12,padding:"14px 18px"}}><div style={{fontSize:12,fontWeight:700,color:"#92400E",marginBottom:6}}>📝 Climate & Code Notes</div><div style={{fontSize:12,color:"#78350F",lineHeight:1.7}}>{result.climateNotes}</div></div>}
+    </div>}
+    {!result&&!loading&&!error&&<div style={{...s.card,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:220,color:C.textLight,gap:12}}>
+      <span style={{fontSize:40}}>🌤️</span><div style={{fontSize:14,fontWeight:600}}>Enter a city to get ASHRAE design conditions</div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
+        {["New York, NY","Miami, FL","Chicago, IL","Denver, CO","Phoenix, AZ","Seattle, WA"].map(c=><button key={c} onClick={()=>setCity(c)} style={{padding:"4px 12px",borderRadius:20,border:"1px solid "+C.border,background:C.surface,color:C.textMuted,fontSize:11,cursor:"pointer"}}>{c}</button>)}
+      </div>
+    </div>}
+  </div>;
+}
+
+// ── HVAC EQUATIONS ────────────────────────────────────────
+function EqCard({title,children}){return <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"16px 20px"}}><div style={{fontSize:13,fontWeight:700,color:C.text,borderBottom:"2px solid "+C.accent,paddingBottom:7,marginBottom:14}}>{title}</div>{children}</div>;}
+function Frac({top,bot}){return <span style={{display:"inline-flex",flexDirection:"column",alignItems:"center",verticalAlign:"middle",margin:"0 4px",fontSize:13}}><span style={{borderBottom:"1.5px solid "+C.text,paddingBottom:1,paddingInline:4}}>{top}</span><span style={{paddingTop:1}}>{bot}</span></span>;}
+function CI({label,value,onChange,unit}){return <div><label style={{...s.label,marginBottom:3}}>{label}{unit&&<span style={{color:C.textLight}}> ({unit})</span>}</label><input style={s.input} type="number" value={value} onChange={e=>onChange(e.target.value)}/></div>;}
+function RR({label,value,unit,hi}){return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:hi?C.accentLight:C.surfaceAlt,borderRadius:7,marginBottom:6,border:hi?"1px solid #BFDBFE":"1px solid "+C.border}}><span style={{fontSize:12,color:C.textMuted}}>{label}</span><span style={{fontSize:15,fontWeight:700,color:hi?C.accent:C.text}}>{value}<span style={{fontSize:11,fontWeight:400,color:C.textLight,marginLeft:4}}>{unit}</span></span></div>;}
+function CoolingCalc(){const[cfm,setCfm]=useState("1000"),[dt,setDt]=useState("20"),[dw,setDw]=useState("20"),[dh,setDh]=useState("5"),[u,setU]=useState("0.065"),[a,setA]=useState("500");const hs=r2(1.08*nv(cfm)*nv(dt)),hl=r2(0.68*nv(cfm)*nv(dw)),ht=r2(4.5*nv(cfm)*nv(dh)),hts=r2(hs+hl),shr=hts>0?r2(hs/hts):0,hc=r2(nv(u)*nv(a)*nv(dt));return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}><div><p style={s.secTitle}>Inputs</p><div style={{display:"grid",gap:10}}><CI label="CFM" value={cfm} onChange={setCfm} unit="cu.ft/min"/><CI label="dT" value={dt} onChange={setDt} unit="F"/><CI label="dW" value={dw} onChange={setDw} unit="gr/lb"/><CI label="dh" value={dh} onChange={setDh} unit="Btu/lb"/><CI label="U-Value" value={u} onChange={setU} unit="Btu/hr·ft²·F"/><CI label="Area" value={a} onChange={setA} unit="ft²"/></div></div><div><p style={s.secTitle}>Results</p><RR label="Sensible Heat" value={hs.toLocaleString()} unit="Btu/hr"/><RR label="Latent Heat" value={hl.toLocaleString()} unit="Btu/hr"/><RR label="Total Heat (cfm)" value={ht.toLocaleString()} unit="Btu/hr" hi/><RR label="SHR" value={shr} unit=""/><RR label="Conduction Q" value={hc.toLocaleString()} unit="Btu/hr"/><RR label="Cooling Tons" value={r2(hts/12000)} unit="tons" hi/></div></div>;}
+function WaterCalc(){const[gpm,setGpm]=useState("100"),[dt,setDt]=useState("12"),[tons,setTons]=useState("50"),[de,setDe]=useState("10"),[dc,setDc]=useState("10");return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}><div><p style={s.secTitle}>Inputs</p><div style={{display:"grid",gap:10}}><CI label="GPM" value={gpm} onChange={setGpm} unit="gal/min"/><CI label="dT" value={dt} onChange={setDt} unit="F"/><CI label="Cooling Load" value={tons} onChange={setTons} unit="tons"/><CI label="Evap dT" value={de} onChange={setDe} unit="F"/><CI label="Cond dT" value={dc} onChange={setDc} unit="F"/></div></div><div><p style={s.secTitle}>Results</p><RR label="Heat Transfer" value={r2(500*nv(gpm)*nv(dt)).toLocaleString()} unit="Btu/hr" hi/><RR label="Evap GPM" value={nv(de)>0?r2(nv(tons)*24/nv(de)):0} unit="GPM" hi/><RR label="Cond GPM" value={nv(dc)>0?r2(nv(tons)*30/nv(dc)):0} unit="GPM" hi/></div></div>;}
+function FanLawCalc(){const[c1,setC1]=useState("10000"),[r1,setR1]=useState("800"),[b1,setB1]=useState("5"),[r2_,setR2]=useState("900");const ratio=nv(r1)>0?nv(r2_)/nv(r1):0;return <div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>{[["CFM1",c1,setC1],["RPM1",r1,setR1],["BHP1",b1,setB1],["RPM2",r2_,setR2]].map(([l,v,fn])=><div key={l}><label style={s.label}>{l}</label><input style={s.input} type="number" value={v} onChange={e=>fn(e.target.value)}/></div>)}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}><div style={s.resItem}><div style={s.resVal}>{r2(nv(c1)*ratio).toLocaleString()}</div><div style={s.resLabel}>CFM2</div></div><div style={s.resItem}><div style={s.resVal}>{r2(ratio*ratio)}x</div><div style={s.resLabel}>SP ratio</div></div><div style={s.resItem}><div style={s.resVal}>{r2(nv(b1)*Math.pow(ratio,3))}</div><div style={s.resLabel}>BHP2</div></div></div></div>;}
+function PumpLawCalc(){const[g1,setG1]=useState("500"),[r1,setR1]=useState("1750"),[h1,setH1]=useState("80"),[b1,setB1]=useState("15"),[r2_,setR2]=useState("1450");const ratio=nv(r1)>0?nv(r2_)/nv(r1):0;return <div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>{[["GPM1",g1,setG1],["RPM1",r1,setR1],["Head1 ft",h1,setH1],["BHP1",b1,setB1],["RPM2",r2_,setR2]].map(([l,v,fn])=><div key={l}><label style={s.label}>{l}</label><input style={s.input} type="number" value={v} onChange={e=>fn(e.target.value)}/></div>)}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}><div style={s.resItem}><div style={s.resVal}>{r2(nv(g1)*ratio).toLocaleString()}</div><div style={s.resLabel}>GPM2</div></div><div style={s.resItem}><div style={s.resVal}>{r2(nv(h1)*ratio*ratio)}</div><div style={s.resLabel}>Head2 ft</div></div><div style={s.resItem}><div style={s.resVal}>{r2(nv(b1)*Math.pow(ratio,3))}</div><div style={s.resLabel}>BHP2</div></div></div></div>;}
+function AirChangeCalc(){const[cfm,setCfm]=useState("2000"),[vol,setVol]=useState("10000"),[achr,setAchr]=useState("8");return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}><div><p style={s.secTitle}>CFM → AC/HR</p><div style={{display:"grid",gap:10,marginBottom:14}}><CI label="Airflow" value={cfm} onChange={setCfm} unit="CFM"/><CI label="Volume" value={vol} onChange={setVol} unit="ft³"/></div><RR label="Air Changes/Hr" value={nv(vol)>0?r2(nv(cfm)*60/nv(vol)):0} unit="AC/HR" hi/><p style={{...s.secTitle,marginTop:18}}>AC/HR → CFM</p><CI label="Design AC/HR" value={achr} onChange={setAchr} unit="AC/HR"/><div style={{marginTop:10}}><RR label="Required CFM" value={r2(nv(achr)*nv(vol)/60)} unit="CFM" hi/></div></div><div><p style={s.secTitle}>Typical AC/HR</p><table style={{...s.table,fontSize:12}}><thead><tr><th style={s.th}>Space</th><th style={{...s.th,textAlign:"right"}}>AC/HR</th></tr></thead><tbody>{[["Office","6-10"],["Conference","8-12"],["Kitchen","15-30"],["Hospital","6-12"],["OR","15-20"],["Data Center","30-60+"],["Warehouse","2-6"]].map(([r,v])=><tr key={r}><td style={s.td}>{r}</td><td style={{...s.td,textAlign:"right",fontWeight:600,color:C.accent}}>{v}</td></tr>)}</tbody></table></div></div>;}
+const LEGENDS={
+  cooling:[
+    ["Qs","Sensible heat gain","Btu/hr"],
+    ["Ql","Latent heat gain","Btu/hr"],
+    ["Qt","Total heat gain (enthalpy method)","Btu/hr"],
+    ["Q_cond","Conductive heat transfer","Btu/hr"],
+    ["1.08","Constant = 0.244 Btu/(lb·°F) × 60 min/hr × 0.075 lb/ft³","—"],
+    ["0.68","Constant = 1,076 Btu/lb × 60 min/hr × 0.075 lb/ft³ × (1/7,000 gr/lb)","—"],
+    ["4.5","Constant = 60 min/hr × 0.075 lb/ft³","—"],
+    ["CFM","Airflow rate","ft³/min"],
+    ["ΔT","Temperature difference (entering minus leaving)","°F"],
+    ["ΔW_gr","Humidity ratio difference","grains/lb"],
+    ["Δh","Enthalpy difference","Btu/lb"],
+    ["U","Overall heat transfer coefficient","Btu/(hr·ft²·°F)"],
+    ["A","Surface area","ft²"],
+  ],
+  water:[
+    ["GPM","Flow rate","gal/min"],
+    ["500","Constant = 1.0 Btu/(lb·°F) × 60 min/hr × 8.33 lb/gal","—"],
+    ["ΔT","Temperature difference (supply minus return)","°F"],
+    ["Tons","Cooling or heating capacity","tons"],
+    ["24","Chilled water constant (500 / 20.9 specific heat factor)","—"],
+    ["30","Condenser water constant (accounts for ~25% heat of rejection)","—"],
+    ["Btu/hr","Rate of heat transfer","Btu/hr"],
+    ["1 ton","12,000 Btu/hr","—"],
+    ["1 psi","2.31 ft of water","—"],
+  ],
+  airchange:[
+    ["AC/HR","Air changes per hour","changes/hr"],
+    ["CFM","Airflow rate","ft³/min"],
+    ["Volume","Room or space volume (L × W × H)","ft³"],
+    ["60","Minutes per hour conversion","min/hr"],
+  ],
+  fanlaws:[
+    ["CFM₁ / CFM₂","Airflow at speed 1 / speed 2","ft³/min"],
+    ["RPM₁ / RPM₂","Fan speed at condition 1 / condition 2","rev/min"],
+    ["SP₁ / SP₂","Static pressure at speed 1 / speed 2","in. wg"],
+    ["BHP₁ / BHP₂","Brake horsepower at speed 1 / speed 2","hp"],
+    ["Note","Flow varies with speed ratio; pressure varies with square; power varies with cube","—"],
+  ],
+  pumplaws:[
+    ["GPM₁ / GPM₂","Flow rate at speed 1 / speed 2","gal/min"],
+    ["RPM₁ / RPM₂","Pump speed at condition 1 / condition 2","rev/min"],
+    ["Head₁ / Head₂","Pump head at speed 1 / speed 2","ft"],
+    ["BHP₁ / BHP₂","Brake horsepower at speed 1 / speed 2","hp"],
+    ["Note","Flow varies with speed ratio; head varies with square; power varies with cube","—"],
+  ],
+};
+
+function Legend({items}){
+  return(
+    <div style={{marginTop:20,background:C.surfaceAlt,borderRadius:10,padding:"14px 18px"}}>
+      <p style={{...s.secTitle,marginBottom:10}}>Legend</p>
+      <table style={{...s.table,fontSize:12}}><thead><tr>
+        <th style={{...s.th,width:120}}>Symbol</th>
+        <th style={s.th}>Definition</th>
+        <th style={{...s.th,width:160}}>Units</th>
+      </tr></thead><tbody>
+        {items.map(([sym,def,unit])=>(
+          <tr key={sym}>
+            <td style={{...s.td,fontWeight:700,color:C.accent,fontFamily:"Georgia,serif"}}>{sym}</td>
+            <td style={{...s.td,color:C.text}}>{def}</td>
+            <td style={{...s.td,color:C.textMuted,fontSize:11}}>{unit}</td>
+          </tr>
+        ))}
+      </tbody></table>
+    </div>
+  );
+}
+
+function HVACEquations(){
+  const [sec,setSec]=useState("cooling");
+  const secs=[{id:"cooling",label:"Cooling & Heating"},{id:"water",label:"Water Systems"},{id:"airchange",label:"Air Change Rate"},{id:"fanlaws",label:"Fan Laws"},{id:"pumplaws",label:"Pump Laws"}];
+  return <div><div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>{secs.map(x=><button key={x.id} onClick={()=>setSec(x.id)} style={{padding:"6px 14px",borderRadius:20,border:"1px solid "+(sec===x.id?C.accent:C.border),background:sec===x.id?C.accent:"white",color:sec===x.id?"white":C.textMuted,fontSize:12,cursor:"pointer"}}>{x.label}</button>)}</div>
+    {sec==="cooling"&&<EqCard title="Sensible / Latent / Total Heat"><div style={{fontSize:13,marginBottom:14,lineHeight:2}}><div>Qs = 1.08 × CFM × ΔT</div><div>Ql = 0.68 × CFM × ΔW_gr</div><div>Qt = 4.5 × CFM × Δh</div><div>Q_cond = U × A × ΔT</div></div><CoolingCalc/><Legend items={LEGENDS.cooling}/></EqCard>}
+    {sec==="water"&&<EqCard title="Water-Side Heat Transfer"><div style={{fontSize:13,marginBottom:14,lineHeight:2.5}}><div>GPM = <Frac top="Btu/hr" bot="500 × ΔT"/></div><div>Evap GPM = <Frac top="Tons × 24" bot="ΔT"/></div><div>Cond GPM = <Frac top="Tons × 30" bot="ΔT"/></div></div><WaterCalc/><Legend items={LEGENDS.water}/></EqCard>}
+    {sec==="airchange"&&<EqCard title="Air Change Rate"><div style={{fontSize:13,marginBottom:14,lineHeight:2.5}}><div>AC/HR = <Frac top="CFM × 60" bot="Volume (ft³)"/></div></div><AirChangeCalc/><Legend items={LEGENDS.airchange}/></EqCard>}
+    {sec==="fanlaws"&&<EqCard title="Fan Affinity Laws"><div style={{fontSize:13,marginBottom:14,lineHeight:2}}><div>CFM₂ = CFM₁ × (RPM₂/RPM₁)</div><div>SP₂ = SP₁ × (RPM₂/RPM₁)²</div><div>BHP₂ = BHP₁ × (RPM₂/RPM₁)³</div></div><FanLawCalc/><Legend items={LEGENDS.fanlaws}/></EqCard>}
+    {sec==="pumplaws"&&<EqCard title="Pump Affinity Laws"><div style={{fontSize:13,marginBottom:14,lineHeight:2}}><div>GPM₂ = GPM₁ × (RPM₂/RPM₁)</div><div>Head₂ = Head₁ × (RPM₂/RPM₁)²</div><div>BHP₂ = BHP₁ × (RPM₂/RPM₁)³</div></div><PumpLawCalc/><Legend items={LEGENDS.pumplaws}/></EqCard>}
+  </div>;
+}
+
+// ── CODE ASSISTANT ────────────────────────────────────────
+const CODE_REFS={
+  "ASHRAE 62.1":{color:"1D4ED8",sections:[{ref:"6.2",title:"Ventilation Rate Procedure",summary:"Min OA = Rp × Pz + Ra × Az. Rp is per-person rate, Ra is per-area rate."},{ref:"6.2.2",title:"Zone Air Distribution",summary:"Ez factor: 1.0 ceiling supply, 0.8 ceiling return only, 0.7 floor supply."},{ref:"4.1",title:"Outdoor Air Acceptance",summary:"OA quality per particulates, CO, ozone before introducing to occupied spaces."}]},
+  "ASHRAE 90.1":{color:"7C3AED",sections:[{ref:"6.4.3",title:"Air-Side Economizer",summary:"Required for systems ≥54,000 Btu/hr in most climate zones. High-limit shutoff required."},{ref:"6.5.2",title:"VAV Fan Control",summary:"VAV systems ≥5 hp must have VFD. Static pressure setpoint reset required."},{ref:"6.5.3",title:"Energy Recovery",summary:"Required when OA% exceeds threshold by climate zone. Min 50% effectiveness."},{ref:"6.5.6",title:"Equipment Efficiency",summary:"Minimum COP, EER, IPLV for chillers, DX, boilers, cooling towers."}]},
+  "IMC":{color:"059669",sections:[{ref:"403",title:"Mechanical Ventilation",summary:"OA quantities per Table 403.3.1.1 by occupancy category."},{ref:"404",title:"Exhaust Ventilation",summary:"Bathrooms: 50/20 cfm. Kitchens: 100 cfm min. Garages: specific requirements."},{ref:"506",title:"Kitchen Exhaust",summary:"Type I hoods for grease/smoke. Type II for heat/moisture only. Makeup air required."},{ref:"607",title:"Fire & Smoke Dampers",summary:"Required at fire-rated penetrations. Smoke dampers at smoke barriers. Access required."}]},
+  "NFPA 90A":{color:"DC2626",sections:[{ref:"4.3",title:"Fire Dampers",summary:"UL 555 listed. Fusible link at 165°F. Required at fire-rated assembly penetrations."},{ref:"4.4",title:"Smoke Dampers",summary:"At smoke barriers and smoke compartments. Actuated by smoke detection."},{ref:"5.3",title:"Fan Shutdown",summary:"Supply fans must shut down on smoke detection in return or supply ductwork."}]},
+};
+function CodeAssistant(){
+  const [messages,setMessages]=useState([{role:"assistant",content:"Hi! I'm your HVAC code assistant. Ask me anything about ASHRAE 62.1, 90.1, 55, IMC, NFPA 90A, ventilation rates, equipment efficiency, fire dampers, and more."}]);
+  const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [activeCode,setActiveCode]=useState("ASHRAE 62.1");const [search,setSearch]=useState("");
+  const bottomRef=useRef();const inputRef=useRef();
+  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[messages]);
+  const send=async()=>{
+    const text=input.trim();if(!text||loading)return;
+    setInput("");const msgs=[...messages,{role:"user",content:text}];setMessages(msgs);setLoading(true);
+    try{
+      const resp=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are an expert HVAC mechanical engineering code consultant. Knowledge of ASHRAE 62.1, 90.1, 55, IMC, NFPA 90A, IBC, SMACNA. Concise, accurate, practical answers. Include section numbers.",messages:msgs.map(m=>({role:m.role,content:m.content}))})});
+      const data=await resp.json();
+      setMessages(p=>[...p,{role:"assistant",content:data.content?.map(i=>i.text||"").join("")||"Sorry, try again."}]);
+    }catch{setMessages(p=>[...p,{role:"assistant",content:"Connection error."}]);}
+    setLoading(false);setTimeout(()=>inputRef.current?.focus(),100);
+  };
+  const gd=CODE_REFS[activeCode];
+  const filtered=gd.sections.filter(s=>!search||s.ref.includes(search)||s.title.toLowerCase().includes(search.toLowerCase())||s.summary.toLowerCase().includes(search.toLowerCase()));
+  return <div style={{display:"grid",gridTemplateColumns:"1fr 360px",gap:16,height:"calc(100vh - 180px)",minHeight:550}}>
+    <div style={{display:"flex",flexDirection:"column",background:C.surface,border:"1px solid "+C.border,borderRadius:12,overflow:"hidden"}}>
+      <div style={{padding:"12px 20px",borderBottom:"1px solid "+C.border,background:C.surfaceAlt,display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:32,height:32,borderRadius:8,background:C.accent,display:"flex",alignItems:"center",justifyContent:"center"}}>🤖</div>
+        <div><div style={{fontSize:13,fontWeight:700}}>HVAC Code Assistant</div><div style={{fontSize:11,color:C.textMuted}}>ASHRAE · IMC · NFPA</div></div>
+        <button onClick={()=>setMessages([{role:"assistant",content:"Hi! I'm your HVAC code assistant."}])} style={{marginLeft:"auto",background:"none",border:"1px solid "+C.border,borderRadius:6,padding:"4px 10px",fontSize:11,color:C.textMuted,cursor:"pointer"}}>Clear</button>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
+        {messages.map((m,i)=><div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",flexDirection:m.role==="user"?"row-reverse":"row"}}>
+          <div style={{width:28,height:28,borderRadius:7,background:m.role==="user"?C.accent:C.surfaceAlt,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13}}>{m.role==="user"?"U":"🤖"}</div>
+          <div style={{maxWidth:"82%",padding:"10px 14px",borderRadius:m.role==="user"?"12px 4px 12px 12px":"4px 12px 12px 12px",background:m.role==="user"?C.accent:C.surfaceAlt,color:m.role==="user"?"#fff":C.text,fontSize:12.5,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{m.content}</div>
+        </div>)}
+        {loading&&<div style={{display:"flex",gap:10}}><div style={{width:28,height:28,borderRadius:7,background:C.surfaceAlt,display:"flex",alignItems:"center",justifyContent:"center"}}>🤖</div><div style={{padding:"10px 14px",borderRadius:"4px 12px 12px 12px",background:C.surfaceAlt,color:C.textMuted,fontSize:12}}>Thinking...</div></div>}
+        <div ref={bottomRef}/>
+      </div>
+      <div style={{padding:"8px 16px",borderTop:"1px solid "+C.border,display:"flex",gap:6,flexWrap:"wrap"}}>
+        {["Min OA for office?","When is economizer required?","Fire damper locations?","Kitchen hood requirements?"].map((q,i)=><button key={i} onClick={()=>{setInput(q);inputRef.current?.focus();}} style={{padding:"3px 10px",borderRadius:20,border:"1px solid "+C.border,background:C.surface,color:C.textMuted,fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>{q}</button>)}
+      </div>
+      <div style={{padding:"12px 16px",borderTop:"1px solid "+C.border,display:"flex",gap:8}}>
+        <input ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} placeholder="Ask about a code section..." style={{...s.input,flex:1}}/>
+        <button onClick={send} disabled={loading||!input.trim()} style={{...s.btn,padding:"8px 18px",opacity:loading||!input.trim()?0.5:1,flexShrink:0}}>Send</button>
+      </div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",background:C.surface,border:"1px solid "+C.border,borderRadius:12,overflow:"hidden"}}>
+      <div style={{padding:"12px 14px",borderBottom:"1px solid "+C.border,background:C.surfaceAlt}}>
+        <div style={{fontSize:13,fontWeight:700,marginBottom:8}}>📋 Code Reference</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:8}}>{Object.keys(CODE_REFS).map(code=>{const act=activeCode===code,hex=CODE_REFS[code].color;return <button key={code} onClick={()=>{setActiveCode(code);setSearch("");}} style={{padding:"3px 9px",borderRadius:5,border:"2px solid "+(act?"#"+hex:C.border),background:act?"#"+hex:C.surface,color:act?"#fff":C.textMuted,fontSize:10.5,cursor:"pointer"}}>{code}</button>;})}</div>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search sections..." style={{...s.input,fontSize:12,padding:"6px 10px"}}/>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"10px 12px",display:"flex",flexDirection:"column",gap:8}}>
+        {filtered.map((sec,i)=><div key={i} style={{border:"1px solid "+C.border,borderRadius:8,overflow:"hidden"}}>
+          <div style={{padding:"7px 12px",background:"#"+gd.color,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:11,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.2)",padding:"1px 7px",borderRadius:4}}>{activeCode} §{sec.ref}</span>
+            <span style={{fontSize:11,fontWeight:700,color:"#fff",flex:1}}>{sec.title}</span>
+            <button onClick={()=>setInput("Explain "+activeCode+" §"+sec.ref+" "+sec.title)} style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:5,padding:"2px 8px",color:"#fff",fontSize:10,cursor:"pointer"}}>Ask AI</button>
+          </div>
+          <div style={{padding:"8px 12px",fontSize:11.5,color:C.text,lineHeight:1.6}}>{sec.summary}</div>
+        </div>)}
+      </div>
+    </div>
+  </div>;
+}
+
+// ── DRAWING CHECKLIST ─────────────────────────────────────
+const CHECKLIST_DATA={
+  "SD":{label:"Schematic Design",color:"7C3AED",sections:[{title:"SD Workflow",items:["AHU zoning diagram","SF/ton load calcs and preliminary ventilation calcs","Local code review","Preliminary AHU, Chiller, Boiler sizing","Electrical requirements to EE, weights to structural","Coordinate equipment locations with architect","Layout mechanical rooms","Preliminary ductwork and piping riser sizing","Layout mechanical shafts — conservative sizing"]},{title:"Basis of Design",items:["SD narrative for contractor pricing and client/architect review"]}]},
+  "DD50":{label:"50% DD",color:"0891B2",sections:[{title:"50% DD Workflow",items:["Revise AHU zoning","Revise load calcs","Preliminary pump, fan, DX/VRF selections","Mechanical room layouts — all equipment placed","Confirm risers vs. arch ceilings / structural","Begin mechanical schedules","QAQC"]},{title:"50% DD Deliverables",items:["Legend and preliminary sheet list","Floor plans with most equipment placed","Schedules started with major equipment sizes"]}]},
+  "DD100":{label:"100% DD",color:"1D4ED8",sections:[{title:"100% DD Workflow",items:["IESVE load calculations","ASHRAE 62.1 ventilation calcs","Exhaust and air balance calcs","Psychrometric calcs for leaving coil temps","DD equipment resizing and reselections","Place all diffusers, VAV boxes, fire dampers","Size and draw all ductwork and hydronic piping","Locate controls: thermostats, CO2 sensors","QAQC"]},{title:"100% DD Deliverables",items:["Floor plans 90% complete","Details and controls 75% complete","Schedules with all equipment"]}]},
+  "CD50":{label:"50% CD",color:"059669",sections:[{title:"50% CD Workflow",items:["Final equipment selections (AHU, Chiller, Boiler, Pumps, Fans)","Finalize piping and air pressure drop calcs","Air distribution layout finalized","Coordinate diffusers with ceiling grids and lights","Confirm fire/smoke damper locations","Standard details, controls, riser diagrams completed","Schedules 100% complete","Begin clash detection","QAQC"]},{title:"50% CD Deliverables",items:["Floor plans 95% complete","Details, controls, risers 100% complete","Schedules 100% complete"]}]},
+  "CD100":{label:"100% CD",color:"DC2626",sections:[{title:"100% CD Workflow",items:["Keynotes and general notes finalized","Clash detection completed","Final QAQC","Finalize specifications","Energy code compliance forms"]}]},
+};
+function DrawingChecklist(){
+  const phases=Object.keys(CHECKLIST_DATA);
+  const [ap,setAp]=useState("SD");
+  const [checks,setChecks]=useState(()=>{const init={};Object.entries(CHECKLIST_DATA).forEach(([ph,pd])=>{pd.sections.forEach((sec,si)=>{sec.items.forEach((_,ii)=>{init[ph+"-"+si+"-"+ii]=false;});});});return init;});
+  const toggle=key=>setChecks(p=>({...p,[key]:!p[key]}));
+  const pd=CHECKLIST_DATA[ap];const hex="#"+pd.color;
+  const tot=pd.sections.reduce((a,s)=>a+s.items.length,0);
+  const chk=pd.sections.reduce((a,s,si)=>a+s.items.filter((_,ii)=>checks[ap+"-"+si+"-"+ii]).length,0);
+  const pct=tot>0?Math.round(chk/tot*100):0;
+  const oPct=ph=>{const d=CHECKLIST_DATA[ph];const t=d.sections.reduce((a,s)=>a+s.items.length,0);const c=d.sections.reduce((a,s,si)=>a+s.items.filter((_,ii)=>checks[ph+"-"+si+"-"+ii]).length,0);return t>0?Math.round(c/t*100):0;};
+  return <div>
+    <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+      {phases.map(ph=>{const d=CHECKLIST_DATA[ph];const p2=oPct(ph);const act=ap===ph;return <div key={ph} onClick={()=>setAp(ph)} style={{cursor:"pointer",padding:"12px 16px",borderRadius:10,border:"2px solid "+(act?"#"+d.color:C.border),background:act?"#"+d.color:C.surface,minWidth:120,userSelect:"none"}}>
+        <div style={{fontSize:12,fontWeight:700,color:act?"#fff":C.text,marginBottom:4}}>{d.label}</div>
+        <div style={{fontSize:10,color:act?"rgba(255,255,255,0.8)":C.textMuted,marginBottom:4}}>{p2}%</div>
+        <div style={{height:3,borderRadius:2,background:act?"rgba(255,255,255,0.3)":C.border}}><div style={{height:3,borderRadius:2,background:act?"#fff":"#"+d.color,width:p2+"%"}}/></div>
+      </div>;})}
+    </div>
+    <div style={{background:hex,borderRadius:12,padding:"14px 22px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div><div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{pd.label}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.8)"}}>{chk}/{tot} items</div></div>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{fontSize:26,fontWeight:700,color:"#fff"}}>{pct}%</div>
+        <button onClick={()=>{const u={...checks};pd.sections.forEach((sec,si)=>sec.items.forEach((_,ii)=>{u[ap+"-"+si+"-"+ii]=true;}));setChecks(u);}} style={{padding:"4px 12px",borderRadius:6,border:"2px solid rgba(255,255,255,0.5)",background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:11,cursor:"pointer"}}>Check All</button>
+        <button onClick={()=>{const u={...checks};pd.sections.forEach((sec,si)=>sec.items.forEach((_,ii)=>{u[ap+"-"+si+"-"+ii]=false;}));setChecks(u);}} style={{padding:"4px 12px",borderRadius:6,border:"2px solid rgba(255,255,255,0.5)",background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:11,cursor:"pointer"}}>Reset</button>
+      </div>
+    </div>
+    <div style={{height:7,borderRadius:3,background:C.border,marginBottom:20}}><div style={{height:7,borderRadius:3,background:hex,width:pct+"%",transition:"width 0.3s"}}/></div>
+    {pd.sections.map((sec,si)=>{const sc=sec.items.filter((_,ii)=>checks[ap+"-"+si+"-"+ii]).length;const sp=sec.items.length>0?Math.round(sc/sec.items.length*100):0;return <div key={si} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:12,overflow:"hidden"}}>
+      <div style={{padding:"10px 18px",background:C.surfaceAlt,borderBottom:"1px solid "+C.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:7,height:7,borderRadius:"50%",background:hex}}/><span style={{fontSize:13,fontWeight:700}}>{sec.title}</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:11,color:C.textMuted}}>{sc}/{sec.items.length}</span><div style={{width:70,height:4,borderRadius:2,background:C.border}}><div style={{height:4,borderRadius:2,background:hex,width:sp+"%"}}/></div><span style={{fontSize:11,fontWeight:600,color:hex}}>{sp}%</span></div>
+      </div>
+      <div style={{padding:"6px 0"}}>{sec.items.map((item,ii)=>{const key=ap+"-"+si+"-"+ii,done=checks[key];return <div key={ii} onClick={()=>toggle(key)} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 18px",cursor:"pointer",background:done?"#F0FDF4":"transparent",borderBottom:"1px solid "+C.border}}>
+        <div style={{width:18,height:18,borderRadius:4,border:"2px solid "+(done?"#059669":C.border),background:done?"#059669":"white",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>{done&&<span style={{color:"white",fontSize:11,fontWeight:700}}>✓</span>}</div>
+        <span style={{fontSize:12.5,color:done?C.textMuted:C.text,textDecoration:done?"line-through":"none",lineHeight:1.5}}>{item}</span>
+      </div>;})}
+      </div>
+    </div>;})}
+  </div>;
+}
+
+// ── QC REVIEW ─────────────────────────────────────────────
+const QC_CATS=[
+  {id:"general",label:"General Review",icon:"🔍",prompt:"Review this mechanical drawing for general completeness, coordination issues, missing information, and errors or inconsistencies."},
+  {id:"code",label:"Code Compliance",icon:"📜",prompt:"Review for code compliance against IMC, ASHRAE 62.1, ASHRAE 90.1, NFPA 90A. List violations or concerns."},
+  {id:"coordination",label:"MEP Coordination",icon:"🔗",prompt:"Review for MEP coordination issues. Identify conflicts with electrical, plumbing, or structural systems."},
+  {id:"energy",label:"Energy Compliance",icon:"⚡",prompt:"Review for ASHRAE 90.1 energy code compliance: insulation, equipment efficiencies, controls, energy recovery."},
+  {id:"constructability",label:"Constructability",icon:"🏗️",prompt:"Review for constructability: difficult installations, missing clearances, access issues, field coordination problems."},
+  {id:"presentation",label:"Drawing Presentation",icon:"🎨",prompt:"Review drawing presentation: text overlapping, background patterns cluttering, font compliance, inconsistent text sizes."},
+];
+function QCReview(){
+  const [file,setFile]=useState(null);const [fileName,setFileName]=useState("");const [selCats,setSelCats]=useState(["general"]);const [loading,setLoading]=useState(false);const [results,setResults]=useState([]);const [dragging,setDragging]=useState(false);const [projName,setProjName]=useState("");const [projLoc,setProjLoc]=useState("");const [reviewer,setReviewer]=useState("");const [phases,setPhases]=useState([]);const fileRef=useRef();
+  const handleFile=f=>{if(!f||f.type!=="application/pdf")return;setFile(f);setFileName(f.name);};
+  const hd=e=>{e.preventDefault();e.stopPropagation();};
+  const runReview=async()=>{
+    if(!file||loading)return;const cats=QC_CATS.filter(c=>selCats.includes(c.id));if(!cats.length)return;
+    setLoading(true);
+    const b64=await new Promise((res,rej)=>{const rd=new FileReader();rd.onload=()=>res(rd.result.split(",")[1]);rd.onerror=rej;rd.readAsDataURL(file);});
+    const phTxt=phases.length>0?"\n\nDesign Phase: "+phases.join(", "):"";const locTxt=projLoc?"\nProject Location: "+projLoc:"";
+    const all=await Promise.all(cats.map(async cat=>{
+      try{        const resp=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,system:"You are an expert mechanical engineer performing QC review of HVAC drawings. Organize findings into: CRITICAL ISSUES, MAJOR COMMENTS, MINOR COMMENTS, RECOMMENDATIONS. Number each item.",messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:cat.prompt+(projName?"\nProject: "+projName:"")+locTxt+phTxt+(reviewer?"\nReviewer: "+reviewer:"")}]}]})});
+        const data=await resp.json();return{ok:true,cat,text:data.content?.map(i=>i.text||"").join("")||"No response."};
+      }catch{return{ok:false,cat,text:"Review failed."};}}
+    ));
+    setResults(p=>[{id:Date.now(),ts:new Date().toLocaleString(),fileName,projName,projLoc,reviewer,phases,reviews:all.map(r=>({id:r.cat.id,label:r.cat.label,icon:r.cat.icon,text:r.text}))},...p]);
+    setLoading(false);
+  };
+  const parseSecs=text=>{
+    const cats=[{k:"CRITICAL",l:"Critical Issues",c:"#DC2626",bg:"#FEF2F2",ico:"🚨"},{k:"MAJOR",l:"Major Comments",c:"#D97706",bg:"#FFFBEB",ico:"⚠️"},{k:"MINOR",l:"Minor Comments",c:"#2563EB",bg:"#EFF6FF",ico:"ℹ️"},{k:"RECOMMENDATION",l:"Recommendations",c:"#059669",bg:"#F0FDF4",ico:"💡"}];
+    const secs=[];cats.forEach(cat=>{const m=text.match(new RegExp(cat.k+"[^:]*:(.*?)(?=CRITICAL|MAJOR|MINOR|RECOMMENDATION|$)","si"));if(m&&m[1].trim())secs.push({...cat,content:m[1].trim()});});
+    return secs.length?secs:[{k:"REVIEW",l:"Findings",c:"#374151",bg:"#F9FAFB",ico:"📋",content:text}];
+  };
+  const PHASES=["SD","50% DD","100% DD","50% CD","90% CD","100% IFC"];
+  const pColors={"SD":"7C3AED","50% DD":"0891B2","100% DD":"1D4ED8","50% CD":"059669","90% CD":"D97706","100% IFC":"DC2626"};
+  return <div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+      <div style={s.card}><p style={s.secTitle}>Project Info</p><div style={{display:"grid",gap:10}}>
+        <div><label style={s.label}>Project Name</label><input style={s.input} value={projName} onChange={e=>setProjName(e.target.value)} placeholder="e.g. Main Street Office"/></div>
+        <div><label style={s.label}>Location</label><input style={s.input} value={projLoc} onChange={e=>setProjLoc(e.target.value)} placeholder="e.g. Austin, TX"/></div>
+        <div><label style={s.label}>Reviewer Initials</label><input style={s.input} value={reviewer} onChange={e=>setReviewer(e.target.value)} placeholder="e.g. JD"/></div>
+      </div></div>
+      <div style={s.card}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><p style={{...s.secTitle,marginBottom:0}}>Review Types</p><div style={{display:"flex",gap:6}}><button onClick={()=>setSelCats(QC_CATS.map(c=>c.id))} style={{...s.btnOut,fontSize:11,padding:"3px 10px"}}>All</button><button onClick={()=>setSelCats([])} style={{...s.btnOut,fontSize:11,padding:"3px 10px"}}>None</button></div></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>{QC_CATS.map(cat=>{const act=selCats.includes(cat.id);return <div key={cat.id} onClick={()=>setSelCats(p=>p.includes(cat.id)?p.filter(x=>x!==cat.id):[...p,cat.id])} style={{display:"flex",alignItems:"center",gap:7,padding:"7px 9px",borderRadius:8,border:"2px solid "+(act?C.accent:C.border),background:act?C.accentLight:C.surface,cursor:"pointer",userSelect:"none"}}>
+          <div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(act?C.accent:C.border),background:act?C.accent:"white",display:"flex",alignItems:"center",justifyContent:"center"}}>{act&&<span style={{color:"white",fontSize:9}}>✓</span>}</div>
+          <span style={{fontSize:11}}>{cat.icon}</span><span style={{fontSize:11,fontWeight:act?600:400,color:act?C.accent:C.text}}>{cat.label}</span>
+        </div>;})}
+        </div>
+      </div>
+    </div>
+    <div style={{...s.card,marginBottom:16}}>
+      <p style={{...s.secTitle,marginBottom:4}}>Design Phase</p>
+      <p style={{fontSize:11,color:C.textMuted,marginBottom:10}}>Select the current design phase for this review</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{PHASES.map(ph=>{const act=phases[0]===ph;const hx="#"+pColors[ph];return <div key={ph} onClick={()=>setPhases(act?[]:[ph])} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:8,border:"2px solid "+(act?hx:C.border),background:act?hx+"18":C.surface,cursor:"pointer",userSelect:"none"}}>
+        <div style={{width:13,height:13,borderRadius:50,border:"2px solid "+(act?hx:C.border),background:act?hx:"white",display:"flex",alignItems:"center",justifyContent:"center"}}>{act&&<div style={{width:5,height:5,borderRadius:50,background:"white"}}/>}</div>
+        <span style={{fontSize:12,fontWeight:act?700:400,color:act?hx:C.text}}>{ph}</span>
+      </div>;})}
+      </div>
+    </div>
+    <div style={{...s.card,marginBottom:16}}>
+      <p style={s.secTitle}>Upload Drawing / Document</p>
+      <div style={{display:"flex",gap:16,alignItems:"flex-end",flexWrap:"wrap"}}>
+        <div onDragEnter={e=>{hd(e);setDragging(true);}} onDragLeave={e=>{hd(e);setDragging(false);}} onDragOver={hd} onDrop={e=>{hd(e);setDragging(false);handleFile(e.dataTransfer.files[0]);}} onClick={()=>fileRef.current.click()} style={{flex:1,minHeight:90,border:"2px dashed "+(dragging?C.accent:file?"#059669":C.border),borderRadius:10,background:dragging?C.accentLight:file?"#F0FDF4":C.surfaceAlt,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,cursor:"pointer",padding:14}}>
+          <span style={{fontSize:24}}>{file?"✅":"📄"}</span>
+          <div style={{fontSize:13,fontWeight:600,color:file?"#059669":C.text}}>{file?fileName:"Drag PDF here or click to browse"}</div>
+          {file&&<button onClick={e=>{e.stopPropagation();setFile(null);setFileName("");}} style={{fontSize:11,color:C.danger,background:"none",border:"1px solid "+C.danger,borderRadius:5,padding:"2px 8px",cursor:"pointer"}}>Remove</button>}
+          <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>{if(e.target.files[0])handleFile(e.target.files[0]);e.target.value="";}}/>
+        </div>
+        <button onClick={runReview} disabled={!file||loading||!selCats.length} style={{...s.btn,background:!file||loading||!selCats.length?"#9CA3AF":"#1D4ED8",padding:"12px 20px",fontSize:13,fontWeight:700,cursor:!file||loading?"not-allowed":"pointer",minWidth:150}}>
+          {loading?"Running...":"Run "+selCats.length+" Review"+(selCats.length!==1?"s":"")}
+        </button>
+      </div>
+    </div>
+    {results.map(r=><div key={r.id} style={{...s.card,marginBottom:16}}>
+      <div style={{marginBottom:14}}><div style={{fontSize:14,fontWeight:700}}>{r.fileName}</div><div style={{fontSize:11,color:C.textMuted}}>{r.projName?r.projName+" · ":""}{r.ts}</div></div>
+      {r.reviews.map((rev,ri)=><div key={ri} style={{marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 14px",background:C.surfaceAlt,borderRadius:"8px 8px 0 0",border:"1px solid "+C.border,borderBottom:"none"}}><span>{rev.icon}</span><span style={{fontSize:12,fontWeight:700}}>{rev.label}</span></div>
+        <div style={{border:"1px solid "+C.border,borderRadius:"0 0 8px 8px",overflow:"hidden"}}>
+          {parseSecs(rev.text).map((sec,i)=><div key={i}><div style={{padding:"6px 14px",background:sec.bg,display:"flex",alignItems:"center",gap:7}}><span>{sec.ico}</span><span style={{fontSize:11.5,fontWeight:700,color:sec.c}}>{sec.l}</span></div><div style={{padding:"10px 14px",background:"#fff",fontSize:12,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{sec.content}</div></div>)}
+        </div>
+      </div>)}
+    </div>)}
+    {!results.length&&!loading&&<div style={{...s.card,display:"flex",flexDirection:"column",alignItems:"center",minHeight:180,justifyContent:"center",color:C.textLight,gap:10}}><span style={{fontSize:36}}>🔍</span><div style={{fontSize:14,fontWeight:600}}>Upload a PDF and run a review</div></div>}
+  </div>;
+}
+
+// ── INTRO ─────────────────────────────────────────────────
+const TOOLS=[
+  {id:"sdload",icon:"📐",label:"SD Load Calcs",color:"#7C3AED",desc:"Preliminary cooling load estimates. Drop a PDF to auto-extract spaces. Export to CSV."},
+  {id:"duct",icon:"💨",label:"Duct Sizing",color:"#0891B2",desc:"Size round/rectangular ducts. Velocity or equal friction method. Check any duct size."},
+  {id:"pump",icon:"💧",label:"Pump Sizing",color:"#1D4ED8",desc:"Closed hydronic pump sizing. Links to SD Calcs for auto-GPM."},
+  {id:"psych",icon:"🌡️",label:"Psychrometric",color:"#059669",desc:"AHU schematic with live calculations. Mixed air, coil loads, state point summary."},
+  {id:"boiler",icon:"🔥",label:"Boiler / Heating",color:"#DC2626",desc:"HW heating sizing: MBH per boiler, HW GPM, pump sizing, condensing guidance."},
+  {id:"design",icon:"🌤️",label:"Design Conditions",color:"#0891B2",desc:"ASHRAE 99.6% heating and 1% cooling conditions for any city. Climate zone and code notes."},
+  {id:"equations",icon:"🔢",label:"HVAC Equations",color:"#D97706",desc:"Sensible/latent/total heat, water-side heat transfer, air change rates, fan/pump laws."},
+  {id:"codes",icon:"💬",label:"Code Assistant",color:"#7C3AED",desc:"AI chat for ASHRAE 62.1, 90.1, 55, IMC, NFPA 90A. Built-in code reference panel."},
+  {id:"checklist",icon:"📋",label:"Drawing Checklist",color:"#0369A1",desc:"SD through 100% IFC deliverable checklist with phase progress tracking."},
+  {id:"qc",icon:"🔍",label:"QC Review",color:"#065F46",desc:"Upload a PDF and run parallel AI QC reviews: General, Code, MEP, Energy, Constructability."},
+];
+function IntroTab({onNav}){
+  return <div>
+    <div style={{background:"#1E3A5F",borderRadius:16,padding:"36px 44px",marginBottom:24,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:-40,right:-40,width:200,height:200,borderRadius:"50%",background:"rgba(255,255,255,0.04)",pointerEvents:"none"}}/>
+      <div style={{position:"relative"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
+          <div style={{width:48,height:48,borderRadius:10,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>🏗️</div>
+          <div><div style={{fontSize:22,fontWeight:700,color:"#fff"}}>HVAC Engineering Dashboard</div><div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginTop:3}}>Mechanical Engineering Reference and Calculation Tools</div></div>
+        </div>
+        <p style={{fontSize:13,color:"rgba(255,255,255,0.8)",lineHeight:1.8,maxWidth:640,margin:"0 0 18px 0"}}>Ten integrated tools for mechanical engineers — from SD load estimates through construction document QC. Save and load projects, export to CSV, and use AI-powered features for code lookup, space extraction, and drawing review.</p>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <button onClick={()=>onNav("sdload")} style={{padding:"8px 18px",background:"#fff",color:"#1D4ED8",border:"none",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer"}}>SD Load Calcs</button>
+          <button onClick={()=>onNav("design")} style={{padding:"8px 18px",background:"transparent",color:"#fff",border:"2px solid rgba(255,255,255,0.4)",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>Design Conditions</button>
+          <button onClick={()=>onNav("qc")} style={{padding:"8px 18px",background:"transparent",color:"#fff",border:"2px solid rgba(255,255,255,0.4)",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>QC Review</button>
+        </div>
+      </div>
+    </div>
+    <p style={{...s.secTitle,marginBottom:14}}>All Tools</p>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
+      {TOOLS.map(t=><div key={t.id} onClick={()=>onNav(t.id)} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"14px 16px",cursor:"pointer",borderLeft:"4px solid "+t.color}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:7}}><div style={{width:32,height:32,borderRadius:7,background:C.surfaceAlt,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{t.icon}</div><div style={{fontSize:13,fontWeight:700,color:t.color}}>{t.label}</div></div>
+        <p style={{fontSize:11.5,color:C.textMuted,lineHeight:1.65,margin:"0 0 7px 0"}}>{t.desc}</p>
+        <div style={{fontSize:11,color:t.color,fontWeight:600}}>Open →</div>
+      </div>)}
+    </div>
+  </div>;
+}
+
+// ── PRINT ──────────────────────────────────────────────────
+function printTab(tabId,tabLabel,projName){
+  const content=document.getElementById("tab-content");
+  if(!content)return;
+  const win=window.open("","_blank","width=1000,height=750");
+  if(!win)return alert("Please allow pop-ups to use the print feature.");
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${projName||"HVAC Dashboard"} — ${tabLabel}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}body{padding:32px;color:#374151;background:#fff;font-size:13px}
+  h2{font-size:18px;font-weight:700;color:#1E3A5F;margin-bottom:3px}.sub{font-size:11px;color:#6B7280;margin-bottom:22px;padding-bottom:10px;border-bottom:2px solid #3B82F6}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px}th{background:#F0F2F5;padding:6px 10px;text-align:left;font-size:11px;font-weight:600;color:#6B7280;border-bottom:1px solid #E2E6EA}
+  td{padding:6px 10px;border-bottom:1px solid #E2E6EA}input,select,button,textarea{display:none!important}
+  [style*="cursor:pointer"]{cursor:default!important}@media print{@page{margin:.6in;size:letter}}</style>
+  </head><body>
+  <h2>${projName||"HVAC Engineering Dashboard"}</h2>
+  <div class="sub">${tabLabel} &nbsp;·&nbsp; ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+  ${content.innerHTML}
+  <script>setTimeout(function(){window.print();},400);<\/script></body></html>`);
+  win.document.close();
+}
+
+// ── APP ───────────────────────────────────────────────────
+const TABS=[{id:"intro",label:"🏠 Home"},{id:"sdload",label:"SD Load Calcs"},{id:"duct",label:"Duct Sizing"},{id:"pump",label:"Pump Sizing"},{id:"psych",label:"Psychrometric"},{id:"boiler",label:"🔥 Boiler/Heating"},{id:"design",label:"🌤️ Design Conditions"},{id:"equations",label:"Equations"},{id:"codes",label:"💬 Code AI"},{id:"checklist",label:"📋 Checklist"},{id:"qc",label:"🔍 QC Review"}];
+
+function App(){
+  const [tab,setTab]=useState("intro");
+  const [sdState,setSdState]=useState(initSd);
+  const [pumpLinked,setPumpLinked]=useState(false);
+  const [pumpSource,setPumpSource]=useState("");
+  const [projName,setProjName]=useState("");
+  const [saveStatus,setSaveStatus]=useState("");
+
+  const saveProject=()=>{
+    if(!projName.trim()){setSaveStatus("⚠ Enter a name");setTimeout(()=>setSaveStatus(""),2000);return;}
+    try{localStorage.setItem("hvac_proj_"+projName.trim(),JSON.stringify({sdState,pumpLinked,pumpSource,savedAt:new Date().toISOString()}));setSaveStatus("✓ Saved");}
+    catch{setSaveStatus("✗ Failed");}
+    setTimeout(()=>setSaveStatus(""),2500);
+  };
+  const loadProject=()=>{
+    if(!projName.trim()){setSaveStatus("⚠ Enter a name");setTimeout(()=>setSaveStatus(""),2000);return;}
+    try{
+      const raw=localStorage.getItem("hvac_proj_"+projName.trim());
+      if(!raw){setSaveStatus("⚠ Not found");setTimeout(()=>setSaveStatus(""),2000);return;}
+      const data=JSON.parse(raw);
+      if(data.sdState)setSdState(data.sdState);
+      if(data.pumpLinked!==undefined)setPumpLinked(data.pumpLinked);
+      if(data.pumpSource!==undefined)setPumpSource(data.pumpSource);
+      setSaveStatus("✓ Loaded");
+    }catch{setSaveStatus("✗ Failed");}
+    setTimeout(()=>setSaveStatus(""),2500);
+  };
+  const statusColor=saveStatus.startsWith("✓")?"#059669":saveStatus.startsWith("⚠")?"#D97706":"#DC2626";
+  const tabLabel=TABS.find(t=>t.id===tab)?.label||tab;
+
+  return <div style={s.app}>
+    <div style={s.header} className="no-print">
+      <div style={s.logo}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div><p style={{fontSize:16,fontWeight:600,margin:0}}>HVAC Engineering Dashboard</p><p style={{fontSize:11,color:C.textMuted,margin:"1px 0 0"}}>Mechanical Engineering Tools</p></div>
+      <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <input value={projName} onChange={e=>setProjName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveProject()} placeholder="Project name..." style={{padding:"6px 10px",border:"1px solid "+C.border,borderRadius:7,fontSize:12,outline:"none",width:160}}/>
+        <button onClick={saveProject} style={{padding:"6px 12px",background:C.accent,color:"#fff",border:"none",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>Save
+        </button>
+        <button onClick={loadProject} style={{padding:"6px 12px",background:"transparent",color:C.accent,border:"1px solid "+C.accent,borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Load
+        </button>
+        {saveStatus&&<span style={{fontSize:11,fontWeight:600,color:statusColor,minWidth:70}}>{saveStatus}</span>}
+        <button onClick={()=>printTab(tab,tabLabel,projName)} style={{padding:"6px 12px",background:"#374151",color:"#fff",border:"none",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print
+        </button>
+      </div>
+    </div>
+    <div style={s.nav} className="no-print">{TABS.map(t=><button key={t.id} style={s.tabBtn(tab===t.id)} onClick={()=>setTab(t.id)}>{t.label}</button>)}</div>
+    <div id="tab-content" style={s.content}>
+      {tab==="intro"&&<IntroTab onNav={setTab}/>}
+      {tab==="sdload"&&<SDLoadCalcs sdState={sdState} setSdState={setSdState} projName={projName}/>}
+      {tab==="duct"&&<DuctSizing/>}
+      {tab==="pump"&&<PumpSizing sdState={sdState} pumpLinked={pumpLinked} setPumpLinked={setPumpLinked} pumpSource={pumpSource} setPumpSource={setPumpSource}/>}
+      {tab==="psych"&&<Psychrometric/>}
+      {tab==="boiler"&&<BoilerHeating/>}
+      {tab==="design"&&<DesignConditions/>}
+      {tab==="equations"&&<HVACEquations/>}
+      {tab==="codes"&&<CodeAssistant/>}
+      {tab==="checklist"&&<DrawingChecklist/>}
+      {tab==="qc"&&<QCReview/>}
+    </div>
+  </div>;
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
